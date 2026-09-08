@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+sourceSets.main.java.srcDirs = ['src']
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Starsector core (obfuscated game classes + bundled libs: lwjgl, json, ...)
+    compileOnly fileTree(dir: "${starsectorPath}/starsector-core", include: '*.jar')
+}
+
+jar {
+    destinationDirectory = file('jars')
+    archiveFileName = 'HullmodDispenser.jar'
+}
+
+// Starsector's classloader refuses java.io, java.nio.file and java.lang.reflect to mod code, and the
+// refusal happens at class-resolution time - so a stray import surfaces as a crash somewhere else
+// entirely. Catch it at build time instead by scanning every compiled class's constant pool.
+tasks.register('checkNoForbiddenApis') {
+    dependsOn tasks.named('classes')
+    doLast {
+        def forbidden = ['java/io/', 'java/nio/file/', 'java/lang/reflect/']
+        def offenders = []
+        fileTree(dir: layout.buildDirectory.dir('classes').get().asFile, include: '**/*.class').each { f ->
+            def text = new String(f.bytes, 'ISO-8859-1')
+            forbidden.each { needle ->
+                if (text.contains(needle)) offenders << "${f.name} references ${needle}"
+            }
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException("Forbidden API used (Starsector will refuse to load it):\n  " +
+                    offenders.join('\n  '))
+        }
+    }
+}
+
+tasks.named('jar') { dependsOn tasks.named('checkNoForbiddenApis') }

@@ -1,0 +1,12 @@
+{
+  "id": "hullmod_dispenser",
+  "name": "Hullmod Dispenser",
+  "author": "Oddisz",
+  "utility": "false",
+  "version": "0.1.0",
+  "description": "A back-room arcade of rigged machines that pay out in hullmod blueprints. Trade surplus hulls for tokens at any independent port, then feed them to the Dispenser and pull the handle. Blueprints you already know are never dispensed twice, and duplicates you find elsewhere can be fed back in for more tokens.",
+  "gameVersion": "0.98a-RC8",
+  "jars": ["jars/HullmodDispenser.jar"],
+  "modPlugin": "hullmoddispenser.HullmodDispenserModPlugin",
+  "originalGameVersion": "0.98a-RC8"
+}

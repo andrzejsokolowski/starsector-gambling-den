@@ -1,0 +1,7 @@
+build/
+.gradle/
+gradle.properties
+# Root-anchored: an unanchored rule would also hide src/hullmoddispenser/ on
+# case-insensitive Windows filesystems.
+/HullmodDispenser/
+/HullmodDispenser.zip
