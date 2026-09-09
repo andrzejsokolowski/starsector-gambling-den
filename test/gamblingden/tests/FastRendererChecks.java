@@ -78,6 +78,32 @@ final class FastRendererChecks {
                 }
             }
 
+            Class<?> pachinkoType=new BridgeLoader().loadClass("gamblingden.pachinko.PachinkoPanel");
+            BaseCustomUIPanelPlugin pachinko=factory.create(pachinkoType);
+            Method pachinkoAct=pachinkoType.getDeclaredMethod("act",String.class); pachinkoAct.setAccessible(true);
+            gamblingden.economy.TokenBank.addTokens(1000);
+            pachinkoAct.invoke(pachinko,"category:TOKENS");
+            pachinkoAct.invoke(pachinko,"drop");
+            for(int frame=0;frame<600;frame++) {
+                if(frame==300) pachinkoAct.invoke(pachinko,"skip");
+                pachinko.advance(1f/60);
+                boolean clipped=frame%2==0;
+                enqueue.invoke(exec,(Runnable)()->{
+                    if(clipped) GL11.glEnable(GL11.GL_SCISSOR_TEST); else GL11.glDisable(GL11.GL_SCISSOR_TEST);
+                    GL11.glScissor(15,20,1100,700);
+                });
+                pachinko.renderBelow(1f);
+                if(stalled.getBoolean(detector)) throw new AssertionError("Pachinko forced an asynchronous pipeline stall");
+                enqueue.invoke(exec,(Runnable)()->{
+                    IntBuffer rect=BufferUtils.createIntBuffer(16);
+                    GL11.glGetInteger(GL11.GL_SCISSOR_BOX,rect);
+                    if(GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)!=clipped || rect.get(0)!=15 || rect.get(1)!=20
+                            || rect.get(2)!=1100 || rect.get(3)!=700) throw new AssertionError("Pachinko FR clipping leaked");
+                    if(GL11.glGetError()!=GL11.GL_NO_ERROR) throw new AssertionError("Pachinko FR OpenGL error");
+                });
+                drain(exec,swap); update.invoke(detector);
+            }
+
             // Positive control: the exact v0.4.2 query must reproduce the reported fatal
             // exception. Otherwise this harness is not actually testing the failing path.
             Class<?> bridge=Class.forName("com.genir.renderer.bridge.GL11");
@@ -92,7 +118,7 @@ final class FastRendererChecks {
                 update.invoke(detector);
             }
             if(!reproduced) throw new AssertionError("Old crash condition was not reproduced");
-            System.out.println("PASS: Fast Rendering bridge: 600 panel frames without stalls or clipping leaks; v0.4.2 crash reproduced by control.");
+            System.out.println("PASS: Fast Rendering bridge: 1200 panel frames (600 Slots + 600 Pachinko) without stalls or clipping leaks; v0.4.2 crash reproduced by control.");
         } finally {
             try {
                 enqueue.invoke(exec,(Runnable)()->{
@@ -118,6 +144,7 @@ final class FastRendererChecks {
 
         @Override protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
             if(!name.equals("gamblingden.slots.SlotMachinePanel") && !name.startsWith("gamblingden.slots.SlotMachinePanel$")
+                    && !name.equals("gamblingden.pachinko.PachinkoPanel") && !name.startsWith("gamblingden.pachinko.PachinkoPanel$")
                     && !name.equals("gamblingden.ui.GLDraw")) return super.loadClass(name,resolve);
             Class<?> loaded=findLoadedClass(name);
             if(loaded==null) {

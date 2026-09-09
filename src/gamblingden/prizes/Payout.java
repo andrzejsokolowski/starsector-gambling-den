@@ -30,6 +30,13 @@ public class Payout {
         if (granted != null) throw new IllegalStateException("Prize already collected");
         if (prize == null || !prize.pays() || amount <= 0) return;
         long units = (long) amount * (prize.isCrate() ? Config.countOf(prize) : 1);
+        addUnits(prize, units);
+    }
+
+    /** Explicit item quantities for games which do not pay in Slots' sized crates. */
+    public void addUnits(Prize prize, long units) {
+        if (granted != null) throw new IllegalStateException("Prize already collected");
+        if (prize == null || !prize.pays() || units <= 0) return;
         int room = prize.isCrate() ? MAX_ITEMS - getBlueprintCount() - getWeaponCount()
                 : MAX_MONEY - amountOf(prize);
         lots.put(prize, amountOf(prize) + (int) Math.min(Math.max(0, room), units));

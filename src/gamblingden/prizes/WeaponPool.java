@@ -55,4 +55,6 @@ public class WeaponPool {
     public static void clearCache() {
         cached = null;
     }
+
+    public static boolean isEmpty() { return getDroppable().isEmpty(); }
 }

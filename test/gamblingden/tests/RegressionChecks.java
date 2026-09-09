@@ -491,11 +491,159 @@ public class RegressionChecks {
         check(TokenBank.getTokens()==0 && ((SpinResult)get(panel,"pending")).symbols.size()==5,"Max stake did not charge exactly 40 tokens");
         panel.finishOnDismissal();
     }
+    private static void pachinko() throws Exception {
+        int oldBox = Prize.BOX_SMALL.count, oldWeapons = Prize.WEAPONS_SMALL.count;
+        try {
+            Prize.BOX_SMALL.count = Prize.WEAPONS_SMALL.count = 100;
+            for (var category : gamblingden.pachinko.PachinkoSettings.Category.values()) {
+                boolean[] seen = new boolean[11];
+                for (int seed = 0; seed < 1200; seed++) {
+                    reset(); TokenBank.addTokens(1000);
+                    for (int i = 0; i < 40; i++) hullmods.add(hullmod("pachinko_" + i, 1));
+                    weapons.add(weapon("test_gun", 1, false));
+                    var offer = gamblingden.pachinko.PachinkoRound.offer(category);
+                    int[] expected = {16,8,4,2,1,0,1,2,4,8,16};
+                    for (int i=0;i<11;i++) check(offer.amount(i)==expected[i], "Wrong pachinko pocket layout");
+                    var round = gamblingden.pachinko.PachinkoRound.buy(offer, new Random(seed * 7919L));
+                    check(round != null && TokenBank.getTokens()==1000-offer.cost, "Ball not charged exactly once");
+                    round.advance(1f/60); round.finish(); round.finish(); round.advance(20);
+                    int pocket = round.board.getPocket(); seen[pocket] = true;
+                    int amount = offer.amount(pocket);
+                    check(chips.size() == (category.name().equals("HULLMODS") ? amount : 0), "Pachinko hullmod mismatch/crate multiplication");
+                    check(guns.getOrDefault("test_gun",0) == (category.name().equals("WEAPONS") ? amount : 0), "Pachinko weapon mismatch/crate multiplication");
+                    check(TokenBank.getTokens()==1000-offer.cost+(category.name().equals("TOKENS")?amount:0), "Pachinko token mismatch");
+                    check(credits==0, "Targeted prize unexpectedly converted to credits");
+                    check(amount==0 ? round.getResult().equals("Nothing.") : round.getResult().startsWith("Won "+amount+" "), "Result disagrees with pocket");
+                }
+                for(boolean pocket:seen) check(pocket,"Payout category never reached a pocket");
+            }
+        } finally { Prize.BOX_SMALL.count = oldBox; Prize.WEAPONS_SMALL.count = oldWeapons; }
+
+        reset(); hullmods.add(hullmod("last",1)); TokenBank.addTokens(100);
+        var cap = gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS);
+        check(cap.maximum()==1 && !cap.notice.isEmpty(), "Hullmod shortage was not visible before buying");
+        known.add("last");
+        check(gamblingden.pachinko.PachinkoRound.buy(cap,new Random(3))==null && TokenBank.getTokens()==100, "Stale quote charged tokens");
+        var empty = gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS);
+        check(!empty.canBuy() && empty.maximum()==0,"Exhausted hullmod board still accepts bets");
+        var noWeapons = gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.WEAPONS);
+        check(!noWeapons.canBuy(),"Empty weapon board accepts bets");
+        reset();
+        var noTokens = gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.TOKENS);
+        check(gamblingden.pachinko.PachinkoRound.buy(noTokens,new Random(2))==null && TokenBank.getTokens()==0,"Unaffordable ball was created");
+
+        for (String close:List.of("leave","escape","external")) {
+            reset(); TokenBank.addTokens(100);
+            var panel=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+            // Click real hitboxes: category selector, Drop, attempted mid-flight selector.
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{600f,85f,true});
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{600f,85f,false});
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,623f,true});
+            var round=(gamblingden.pachinko.PachinkoRound)get(panel,"round");
+            check(round!=null && TokenBank.getTokens()==98,"Pachinko mouse Drop does not work");
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,623f,true});
+            check(get(panel,"round")==round && TokenBank.getTokens()==98,"Held mouse bought extra balls");
+            invoke(panel,"act",String.class,"category:WEAPONS");
+            check(get(panel,"category")==gamblingden.pachinko.PachinkoSettings.Category.TOKENS,"Category changed mid-flight");
+            round.board.finish();
+            int amount=round.offer.amount(round.board.getPocket());
+            if(close.equals("leave")) invoke(panel,"act",String.class,"leave");
+            if(close.equals("escape")) panel.processInput(List.of(key(Keyboard.KEY_ESCAPE)));
+            if(close.equals("external")) {
+                int[] calls={0};
+                var delegate=new gamblingden.pachinko.PachinkoDialogDelegate(panel,()->calls[0]++);
+                delegate.reportDismissed(0); delegate.reportDismissed(0);
+                check(calls[0]==1,"Pachinko close callback repeated");
+            }
+            panel.finishOnDismissal(); invoke(panel,"act",String.class,"drop"); invoke(panel,"act",String.class,"skip");
+            check(TokenBank.getTokens()==98+amount && round.isSettled(),"Closing lost/repeated paid ball");
+            check(((LabelAPI)get(panel,"result")).getText().equals(round.getResult()),"Panel result does not match actual receipt");
+        }
+        reset(); TokenBank.addTokens(100);
+        var panel=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+        invoke(panel,"act",String.class,"category:TOKENS"); invoke(panel,"act",String.class,"drop"); invoke(panel,"act",String.class,"skip");
+        var landed=get(panel,"round");
+        invoke(panel,"act",String.class,"category:TOKENS");
+        check(get(panel,"round")==landed,"Same category cleared the paid result");
+        invoke(panel,"act",String.class,"category:WEAPONS");
+        check(get(panel,"round")==null && ((LabelAPI)get(panel,"result")).getText().isEmpty(),"Changed category retained stale result");
+        int checked=0;
+        for(Object button:(List<?>)get(panel,"buttons")) {
+            if((Boolean)get(button,"checked")) checked++;
+            check((Float)get(button,"x")>=0 && (Float)get(button,"x")+(Float)get(button,"w")<=1000
+                    && (Float)get(button,"y")+(Float)get(button,"h")<=660,"Pachinko button outside panel");
+        }
+        check(checked==1,"Pachinko categories are not mutually exclusive");
+        Pbuffer buffer=new Pbuffer(1200,800,new PixelFormat(),null);
+        try {
+            buffer.makeCurrent();
+            for(boolean clip:new boolean[]{false,true}) {
+                if(clip) GL11.glEnable(GL11.GL_SCISSOR_TEST); else GL11.glDisable(GL11.GL_SCISSOR_TEST);
+                GL11.glScissor(15,20,1100,700); panel.renderBelow(1);
+                IntBuffer rect=BufferUtils.createIntBuffer(16); GL11.glGetInteger(GL11.GL_SCISSOR_BOX,rect);
+                check(GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)==clip && rect.get(0)==15 && rect.get(1)==20
+                        && rect.get(2)==1100 && rect.get(3)==700,"Pachinko leaked clipping state");
+                check(GL11.glGetError()==GL11.GL_NO_ERROR,"Pachinko native render error");
+            }
+        } finally { buffer.destroy(); }
+    }
+
+    private static void pachinkoSettings() throws Exception {
+        var loader=lunalib.backend.ui.settings.LunaSettingsLoader.INSTANCE;
+        boolean loaded=loader.getHasLoaded();
+        var previous=lunalib.backend.ui.settings.LunaSettingsLoader.getSettings();
+        // In-memory only: never call save/close on this settings object.
+        var settings=new org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject("unused-test-settings");
+        for(String line:java.nio.file.Files.readAllLines(java.nio.file.Path.of("data/config/LunaSettings.csv"))) {
+            if(!line.startsWith("gd_pachinko_")) continue;
+            String[] columns=line.split(",",-1);
+            check(columns.length==9,"Malformed pachinko Luna settings row");
+            if(columns[2].equals("Int")) settings.put(columns[0],Integer.parseInt(columns[3]));
+        }
+        try {
+            loader.setHasLoaded(true);
+            lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
+            reset(); TokenBank.addTokens(2000); weapons.add(weapon("custom_gun",1,false));
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,100);
+            settings.put("gd_pachinko_cost_weapons",7);
+            var offer=gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.WEAPONS);
+            check(offer.maximum()==100 && offer.cost==7,"Luna custom values ignored");
+            var round=gamblingden.pachinko.PachinkoRound.buy(offer,new Random(12));
+            check(round!=null && TokenBank.getTokens()==1993,"Custom ball cost wrong");
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,1);
+            settings.put("gd_pachinko_cost_weapons",100);
+            round.finish(); round.finish();
+            check(guns.get("custom_gun")==100 && TokenBank.getTokens()==1993,"In-flight settings changed paid ball");
+            check(gamblingden.pachinko.PachinkoRound.buy(offer,new Random(12))==null && TokenBank.getTokens()==1993,"Changed settings silently charged stale quote");
+            settings.put("gd_pachinko_cost_weapons",-5);
+            settings.put("gd_pachinko_pocket_5",Integer.MAX_VALUE);
+            settings.put("gd_pachinko_pocket_0",-1);
+            var bounded=gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.WEAPONS);
+            check(bounded.cost==1 && bounded.amount(0)==100 && bounded.amount(5)==0,"Unsafe settings not clamped");
+
+            reset(); TokenBank.addTokens(Integer.MAX_VALUE);
+            var capped=gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.TOKENS);
+            check(capped.maximum()<=capped.cost && !capped.notice.isEmpty(),"Token cap not advertised");
+            var limit=gamblingden.pachinko.PachinkoRound.buy(capped,new Random(4)); limit.finish();
+            check(TokenBank.getTokens()==Integer.MAX_VALUE-capped.cost+capped.amount(limit.board.getPocket()),"Token cap mismatch");
+
+            reset(); TokenBank.addTokens(100); hullmods.add(hullmod("disappears",1));
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,1);
+            var disappearing=gamblingden.pachinko.PachinkoRound.buy(
+                    gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS),new Random(7));
+            known.add("disappears"); disappearing.finish(); disappearing.finish();
+            check(TokenBank.getTokens()==100 && chips.isEmpty() && credits==0 && disappearing.getResult().contains("refunded"),"Unavailable target was not refunded exactly once");
+        } finally {
+            lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous); loader.setHasLoaded(loaded);
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         if(args.length>0 && args[0].equals("fast-renderer")) {
             setup(); FastRendererChecks.run(RegressionChecks::machine); return;
         }
         setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
+        PachinkoPhysicsChecks.run(); pachinko(); pachinkoSettings();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }

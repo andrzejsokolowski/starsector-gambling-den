@@ -21,6 +21,8 @@ import gamblingden.economy.TokenBank;
 import gamblingden.slots.SlotMachine;
 import gamblingden.slots.SlotMachineDialogDelegate;
 import gamblingden.slots.SlotMachinePanel;
+import gamblingden.pachinko.PachinkoPanel;
+import gamblingden.pachinko.PachinkoDialogDelegate;
 
 /**
  * The shared venue: the keeper, the counter, and game selection. Slots is the first game;
@@ -33,6 +35,7 @@ import gamblingden.slots.SlotMachinePanel;
 public class DenDialog implements InteractionDialogPlugin {
 
     private static final String OPTION_PLAY = "gd_play";
+    private static final String OPTION_PACHINKO = "gd_pachinko";
     private static final String OPTION_SELL_SHIP = "gd_sell_ship";
     private static final String OPTION_SELL_CHIPS = "gd_sell_chips";
     private static final String OPTION_LEAVE = "gd_leave";
@@ -63,9 +66,9 @@ public class DenDialog implements InteractionDialogPlugin {
         this.options = dialog.getOptionPanel();
 
         text.addPara("Down a service corridor, behind a curtain that used to be a thermal "
-                + "blanket, someone has set up a machine the height of a Kite's landing strut. "
-                + "Reels behind cracked glass, a chase of bulbs around the frame, half of them "
-                + "burnt out. A hand-lettered card reads: NO CREDIT. NO REFUNDS. NO EXCEPTIONS.");
+                + "blanket, a row of battered gambling cabinets fills the room. Reels turn "
+                + "behind cracked glass; next to them, steel balls rattle through a forest of pegs. "
+                + "A hand-lettered card reads: NO CREDIT. NO REFUNDS. NO EXCEPTIONS.");
 
         text.addPara("\"It eats hulls,\" the keeper says, before you can ask. \"Not credits. "
                 + "Credits it has seen.\"");
@@ -87,6 +90,8 @@ public class DenDialog implements InteractionDialogPlugin {
             options.setTooltip(OPTION_PLAY, "The cheapest pull costs " + cheapest
                     + (cheapest == 1 ? " token" : " tokens") + ". You have " + tokens + ".");
         }
+
+        options.addOption("Play pachinko", OPTION_PACHINKO);
 
         options.addOption("Sell a hull to the keeper", OPTION_SELL_SHIP);
         if (ShipTradeIn.getTradeableShips().isEmpty()) {
@@ -113,6 +118,16 @@ public class DenDialog implements InteractionDialogPlugin {
 
         if (OPTION_PLAY.equals(optionData)) {
             openCabinet();
+
+        } else if (OPTION_PACHINKO.equals(optionData)) {
+            final PachinkoPanel game = new PachinkoPanel();
+            dialog.showCustomVisualDialog(PachinkoPanel.PANEL_W, PachinkoPanel.PANEL_H,
+                    new PachinkoDialogDelegate(game, new Runnable() {
+                        @Override public void run() {
+                            for (String line : game.getSessionLog()) text.addPara(line);
+                            showMenu();
+                        }
+                    }));
 
         } else if (OPTION_SELL_SHIP.equals(optionData)) {
             pickShipToSell();
