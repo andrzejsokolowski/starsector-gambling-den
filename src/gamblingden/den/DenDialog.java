@@ -1,4 +1,4 @@
-package gamblingden.bar;
+package gamblingden.den;
 
 import java.util.List;
 import java.util.Map;
@@ -6,13 +6,15 @@ import java.util.Map;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.FleetMemberPickerListener;
 import com.fs.starfarer.api.campaign.InteractionDialogAPI;
-import com.fs.starfarer.api.campaign.econ.MarketAPI;
+import com.fs.starfarer.api.campaign.InteractionDialogPlugin;
+import com.fs.starfarer.api.campaign.OptionPanelAPI;
+import com.fs.starfarer.api.campaign.TextPanelAPI;
 import com.fs.starfarer.api.campaign.rules.MemoryAPI;
+import com.fs.starfarer.api.combat.EngagementResultAPI;
 import com.fs.starfarer.api.fleet.FleetMemberAPI;
-import com.fs.starfarer.api.impl.campaign.intel.bar.events.BaseBarEvent;
+import com.fs.starfarer.api.impl.campaign.RuleBasedInteractionDialogPluginImpl;
 import com.fs.starfarer.api.util.Misc;
 
-import gamblingden.Config;
 import gamblingden.economy.ShipTradeIn;
 import gamblingden.economy.TokenBank;
 import gamblingden.slots.SlotMachine;
@@ -20,66 +22,54 @@ import gamblingden.slots.SlotMachineDialogDelegate;
 import gamblingden.slots.SlotMachinePanel;
 
 /**
- * The den in the back of the bar, and the person who keeps it.
+ * The den itself: the keeper, the counter, and the way through to the machine.
  *
- * Turns up at independent ports. Buys surplus hulls and already-read blueprint chips for
- * tokens, and hands the screen over to the machine when you want to play.
+ * Reached from the "Visit the gambling den" option on any port of size 6 or more, which is
+ * added by data/campaign/rules.csv. Takes over the port conversation while you are in there
+ * and hands it back when you leave.
  */
-public class DenBarEvent extends BaseBarEvent {
+public class DenDialog implements InteractionDialogPlugin {
 
     private static final String OPTION_PLAY = "gd_play";
     private static final String OPTION_SELL_SHIP = "gd_sell_ship";
     private static final String OPTION_SELL_CHIPS = "gd_sell_chips";
     private static final String OPTION_LEAVE = "gd_leave";
 
-    /**
-     * Which ports the den is open at.
-     *
-     * Deliberately does not call super. The base version pins an event to the first market it
-     * was shown at, which is right for one person with one proposition and wrong for a place -
-     * the den is the same den wherever you find it, and it should be there every time.
-     */
-    @Override
-    public boolean shouldShowAtMarket(MarketAPI market) {
-        if (market == null) return false;
-        return Config.showsAtFaction(market.getFactionId());
+    private InteractionDialogAPI dialog;
+    private TextPanelAPI text;
+    private OptionPanelAPI options;
+    private final Map<String, MemoryAPI> memoryMap;
+
+    private DenDialog(Map<String, MemoryAPI> memoryMap) {
+        this.memoryMap = memoryMap;
+    }
+
+    /** Hands the conversation over to the den. */
+    public static void open(InteractionDialogAPI dialog, Map<String, MemoryAPI> memoryMap) {
+        DenDialog plugin = new DenDialog(memoryMap);
+        dialog.setPlugin(plugin);
+        plugin.init(dialog);
     }
 
     @Override
-    public void addPromptAndOption(InteractionDialogAPI dialog, Map<String, MemoryAPI> memoryMap) {
-        super.addPromptAndOption(dialog, memoryMap);
+    public void init(InteractionDialogAPI dialog) {
+        this.dialog = dialog;
+        this.text = dialog.getTextPanel();
+        this.options = dialog.getOptionPanel();
 
-        dialog.getTextPanel().addPara("Past the heads, behind a curtain that used to be a "
-                + "thermal blanket, someone has set up a machine the height of a Kite's landing "
-                + "strut. Reels behind cracked glass, a chase of bulbs around the frame, half of "
-                + "them burnt out. A hand-lettered card reads: NO CREDIT. NO REFUNDS. NO "
-                + "EXCEPTIONS. The owner is leaning on it with the proprietary air of a person "
-                + "who owns exactly one thing.");
-
-        dialog.getOptionPanel().addOption("Have a look at the gambling den", this);
-    }
-
-    @Override
-    public void init(InteractionDialogAPI dialog, Map<String, MemoryAPI> memoryMap) {
-        super.init(dialog, memoryMap);
-        done = false;
+        text.addPara("Down a service corridor, behind a curtain that used to be a thermal "
+                + "blanket, someone has set up a machine the height of a Kite's landing strut. "
+                + "Reels behind cracked glass, a chase of bulbs around the frame, half of them "
+                + "burnt out. A hand-lettered card reads: NO CREDIT. NO REFUNDS. NO EXCEPTIONS.");
 
         text.addPara("\"It eats hulls,\" the keeper says, before you can ask. \"Not credits. "
                 + "Credits it has seen. Bring me something you flew in on and do not want to fly "
                 + "out on, and I will give you tokens. Tokens go in the slot.\"");
 
-        text.addPara("\"Set it up however you like. More reels, more chances, more tokens. What "
-                + "comes out of the tray is what the reels say comes out of the tray - cash, "
-                + "cargo, guns, and if you are lucky, a box of hull mod work you have never seen "
-                + "before. It will not sell you a design you already know. That is not mercy, "
-                + "that is the wiring.\"");
-
         showMenu();
     }
 
     private void showMenu() {
-        if (options == null) return;
-
         options.clearOptions();
 
         int tokens = TokenBank.getTokens();
@@ -94,9 +84,8 @@ public class DenBarEvent extends BaseBarEvent {
                     + " tokens - one reel at low stakes. You have " + tokens + ".");
         }
 
-        List<FleetMemberAPI> ships = ShipTradeIn.getTradeableShips();
         options.addOption("Sell a hull to the keeper", OPTION_SELL_SHIP);
-        if (ships.isEmpty()) {
+        if (ShipTradeIn.getTradeableShips().isEmpty()) {
             options.setEnabled(OPTION_SELL_SHIP, false);
             options.setTooltip(OPTION_SELL_SHIP, "You have nothing to sell but your flagship, "
                     + "and the keeper is not interested in that.");
@@ -133,8 +122,15 @@ public class DenBarEvent extends BaseBarEvent {
 
         } else if (OPTION_LEAVE.equals(optionData)) {
             text.addPara("\"It will be here,\" the keeper says. \"It is always here.\"");
-            done = true;
+            backToPort();
         }
+    }
+
+    /** Hands the conversation back to the port so you are not thrown out into space. */
+    private void backToPort() {
+        RuleBasedInteractionDialogPluginImpl port = new RuleBasedInteractionDialogPluginImpl();
+        dialog.setPlugin(port);
+        port.init(dialog);
     }
 
     private void openCabinet() {
@@ -150,15 +146,13 @@ public class DenBarEvent extends BaseBarEvent {
 
     /** Reads back everything the machine actually handed over, itemised. */
     private void afterPlaying(SlotMachinePanel machine) {
-        if (text != null) {
-            List<String> won = machine.getSessionLog();
-            if (won.isEmpty()) {
-                text.addPara("You step back from the machine no better off than you started.");
-            } else {
-                text.addPara("The tray rattles. Out of the machine, in total:");
-                for (String line : won) {
-                    text.addPara("   - " + line);
-                }
+        List<String> won = machine.getSessionLog();
+        if (won.isEmpty()) {
+            text.addPara("You step back from the machine no better off than you started.");
+        } else {
+            text.addPara("The tray rattles. Out of the machine, in total:");
+            for (String line : won) {
+                text.addPara("   - " + line);
             }
         }
         showMenu();
@@ -203,20 +197,35 @@ public class DenBarEvent extends BaseBarEvent {
             total += ShipTradeIn.tradeIn(member);
         }
 
-        if (text != null) {
-            text.addPara("The keeper looks over " + names + ", names a number without consulting "
-                    + "anything, and counts out %s. Somewhere below the bar, a cutting crew is "
-                    + "already being paid.",
-                    Misc.getHighlightColor(),
-                    total + (total == 1 ? " token" : " tokens"));
-        }
+        text.addPara("The keeper looks over " + names + ", names a number without consulting "
+                + "anything, and counts out %s. Somewhere below the bar, a cutting crew is "
+                + "already being paid.",
+                Misc.getHighlightColor(),
+                total + (total == 1 ? " token" : " tokens"));
         Global.getSoundPlayer().playUISound("ui_chip_pickup", 1f, 1f);
         showMenu();
     }
 
     @Override
-    public boolean shouldRemoveEvent() {
-        // The den is a fixture. It goes away when the bar event's own timer runs out.
-        return false;
+    public void optionMousedOver(String optionText, Object optionData) {
+    }
+
+    @Override
+    public void advance(float amount) {
+    }
+
+    @Override
+    public void backFromEngagement(EngagementResultAPI battleResult) {
+    }
+
+    @Override
+    public Object getContext() {
+        return null;
+    }
+
+    /** The port's own memory, handed over by the rule that opened the den. */
+    @Override
+    public Map<String, MemoryAPI> getMemoryMap() {
+        return memoryMap;
     }
 }

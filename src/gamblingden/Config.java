@@ -1,9 +1,7 @@
 package gamblingden;
 
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
@@ -25,9 +23,6 @@ public class Config {
 
     public static final int STAKE_COUNT = 3;
 
-    /** Faction ids whose ports the den is open at. A single "*" means every port with a bar. */
-    public static Set<String> FACTIONS = defaultFactions();
-
     public static float SHIP_TOKENS_PER_FP = 0.6f;
     public static float SHIP_TOKEN_PENALTY_PER_DMOD = 0.1f;
     public static float TOKENS_PER_CREDIT_OF_DUPLICATE = 0.0005f;
@@ -45,18 +40,6 @@ public class Config {
     public static float AMOUNT_VARIANCE = 0.25f;
     public static int CREDITS_PER_BLUEPRINT_OWED = 20000;
     public static float DOUBLE_OR_NOTHING_WIN_CHANCE = 0.45f;
-
-    private static Set<String> defaultFactions() {
-        Set<String> out = new LinkedHashSet<String>();
-        out.add("independent");
-        return out;
-    }
-
-    public static boolean showsAtFaction(String factionId) {
-        if (factionId == null) return false;
-        if (FACTIONS.contains("*")) return true;
-        return FACTIONS.contains(factionId);
-    }
 
     @SuppressWarnings("unchecked")
     private static Map<Prize, Float>[] defaultWeights() {
@@ -90,16 +73,6 @@ public class Config {
     public static void load() {
         try {
             JSONObject json = Global.getSettings().getMergedJSONForMod(Ids.CONFIG_PATH, Ids.MOD_ID);
-
-            JSONArray factions = json.optJSONArray("factions");
-            if (factions != null && factions.length() > 0) {
-                Set<String> read = new LinkedHashSet<String>();
-                for (int i = 0; i < factions.length(); i++) {
-                    String id = factions.optString(i, null);
-                    if (id != null && !id.isEmpty() && !"null".equals(id)) read.add(id);
-                }
-                if (!read.isEmpty()) FACTIONS = read;
-            }
 
             SHIP_TOKENS_PER_FP = (float) json.optDouble("shipTokensPerFleetPoint", SHIP_TOKENS_PER_FP);
             SHIP_TOKEN_PENALTY_PER_DMOD =

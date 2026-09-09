@@ -9,10 +9,10 @@ recovered frigates you are never going to fly.
 
 ## How it works
 
-**Find it.** In the bar at any independent port, every time — it is a place, not a rumour, so it
-is not part of the random bar-event rota and cannot crowd anybody else's events out. A machine
-behind a curtain that used to be a thermal blanket, and a keeper who owns exactly one thing.
-Set `factions` in the config to open it at other ports, or to `["*"]` for every port with a bar.
+**Find it.** *Visit the gambling den* is its own option when you dock at any port of size 6 or
+more — not a bar event, so it is always there rather than turning up at random. A machine behind
+a curtain that used to be a thermal blanket, and a keeper who owns exactly one thing. The size
+requirement is the `$marketSize >= 6` line in `data/campaign/rules.csv` if you want it elsewhere.
 
 **Pay in hulls, not credits.** The keeper buys ships off you for tokens, priced on how much ship
 it is rather than what it is worth on paper, so a pile of frigates is worth having. Every d-mod

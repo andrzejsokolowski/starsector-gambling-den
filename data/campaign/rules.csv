@@ -1,0 +1,7 @@
+id,trigger,conditions,script,text,options
+# The den shows up as its own option at any port big enough to support one.
+gd_add_option,PopulateOptions,"$hasMarket
+$marketSize >= 6
+$menuState == main
+$tradeMode == OPEN",,,20:gd_visit_den:Visit the gambling den,
+gd_visit_selected,DialogOptionSelected,$option == gd_visit_den,GD_OpenGamblingDen,,

@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Random;
 
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
 import com.fs.starfarer.api.Global;
@@ -16,13 +17,10 @@ import com.fs.starfarer.api.campaign.CustomVisualDialogDelegate.DialogCallbacks;
 import com.fs.starfarer.api.graphics.SpriteAPI;
 import com.fs.starfarer.api.input.InputEventAPI;
 import com.fs.starfarer.api.ui.Alignment;
-import com.fs.starfarer.api.ui.ButtonAPI;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 import com.fs.starfarer.api.ui.Fonts;
 import com.fs.starfarer.api.ui.LabelAPI;
 import com.fs.starfarer.api.ui.PositionAPI;
-import com.fs.starfarer.api.ui.TooltipMakerAPI;
-import com.fs.starfarer.api.ui.TooltipMakerAPI.ActionListenerDelegate;
 import com.fs.starfarer.api.ui.UIComponentAPI;
 
 import gamblingden.Config;
@@ -37,9 +35,12 @@ import gamblingden.ui.GLDraw;
  * Each reel is rolled and paid on its own, so nothing has to line up for a pull to be worth
  * something. Lining every reel up doubles the lot.
  *
- * Every action here has a button. Keyboard shortcuts are extras, never the only way in.
+ * The controls are drawn and hit-tested by hand rather than being TooltipMakerAPI buttons.
+ * Two attempts at the button route produced controls that looked right and never fired, so the
+ * machine now owns its own input: the mouse is polled in advance(), which is the one callback
+ * this panel is certain to receive. Everything is clickable; the keys are extras.
  */
-public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionListenerDelegate {
+public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
 
     public static final float PANEL_W = 1000f;
     public static final float PANEL_H = 660f;
@@ -49,17 +50,18 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
 
     private static final float Y_TOKENS = 14f;
     private static final float Y_SETUP = 42f;
-    private static final float H_SETUP = 26f;
-    private static final float Y_COST = 78f;
-    private static final float Y_CABINET = 104f;
-    private static final float H_CABINET = 366f;
+    private static final float H_SETUP = 28f;
+    private static final float Y_COST = 80f;
+    private static final float Y_CABINET = 106f;
+    private static final float H_CABINET = 362f;
     private static final float H_MARQUEE = 46f;
     private static final float Y_WINDOW = Y_CABINET + 52f;
-    private static final float Y_PLATES = 416f;
+    private static final float Y_PLATES = 414f;
     private static final float Y_RESULT = 486f;
     private static final float Y_HINT = 538f;
-    private static final float Y_ACTIONS = 580f;
-    private static final float H_ACTION = 40f;
+    private static final float Y_ACTIONS = 578f;
+    private static final float H_ACTION = 42f;
+    private static final float LABEL_H = 18f;
 
     private static final float REEL_W_MAX = 132f;
     private static final float REEL_GAP = 14f;
@@ -88,20 +90,45 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
     private static final Color LIGHT_OFF = new Color(70, 60, 45);
     private static final Color DIM_TEXT = new Color(150, 155, 175);
 
-    private static final String SOUND_PULL = "ui_button_pressed";
+    private static final Color BTN_FILL = new Color(32, 39, 51);
+    private static final Color BTN_FILL_HOVER = new Color(50, 62, 80);
+    private static final Color BTN_FILL_ON = new Color(52, 92, 124);
+    private static final Color BTN_FILL_OFF = new Color(22, 26, 33);
+    private static final Color BTN_TEXT = new Color(205, 212, 228);
+    private static final Color BTN_TEXT_OFF = new Color(92, 98, 112);
+
+    private static final String SOUND_CLICK = "ui_button_pressed";
+    private static final String SOUND_DENIED = "ui_button_disabled_pressed";
     private static final String SOUND_WIN = "ui_acquired_hullmod";
-    private static final String SOUND_LOSE = "ui_button_disabled_pressed";
     private static final String SOUND_TAKE = "ui_chip_pickup";
 
-    private static final String ACT_PULL = "gd_pull";
-    private static final String ACT_SKIP = "gd_skip";
-    private static final String ACT_TAKE = "gd_take";
-    private static final String ACT_DOUBLE = "gd_double";
-    private static final String ACT_LEAVE = "gd_leave";
-    private static final String ACT_REELS = "gd_reels_";
-    private static final String ACT_STAKE = "gd_stake_";
-
     private enum State { READY, SPINNING, OFFER }
+
+    /** A control the machine draws and hit-tests itself. */
+    private static class Btn {
+        final String action;
+        final float x, y, w, h;
+        LabelAPI label;
+        boolean enabled = true;
+        boolean checked;
+        boolean hovered;
+
+        Btn(String action, float x, float y, float w, float h) {
+            this.action = action;
+            this.x = x;
+            this.y = y;
+            this.w = w;
+            this.h = h;
+        }
+    }
+
+    private static final String ACT_PULL = "pull";
+    private static final String ACT_SKIP = "skip";
+    private static final String ACT_TAKE = "take";
+    private static final String ACT_DOUBLE = "double";
+    private static final String ACT_LEAVE = "leave";
+    private static final String ACT_REELS = "reels:";
+    private static final String ACT_STAKE = "stake:";
 
     private CustomPanelAPI panel;
     private DialogCallbacks callbacks;
@@ -110,8 +137,13 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
     private final Random random = new Random();
     private final List<Reel> reels = new ArrayList<Reel>();
     private final Map<Prize, SpriteAPI> sprites = new EnumMap<Prize, SpriteAPI>(Prize.class);
-    /** Everything won this visit, itemised, for the bar to read out afterwards. */
+    /** Everything won this visit, itemised, for the den to read out afterwards. */
     private final List<String> sessionLog = new ArrayList<String>();
+
+    private final List<Btn> buttons = new ArrayList<Btn>();
+    private Btn pullButton;
+    private boolean wasMouseDown;
+    private boolean dismissed;
 
     private State state = State.READY;
     private int reelCount;
@@ -131,14 +163,6 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
     private LabelAPI resultLabel;
     private LabelAPI hintLabel;
     private final List<LabelAPI> plateLabels = new ArrayList<LabelAPI>();
-
-    private final List<ButtonAPI> reelButtons = new ArrayList<ButtonAPI>();
-    private final List<ButtonAPI> stakeButtons = new ArrayList<ButtonAPI>();
-    private ButtonAPI pullButton;
-    private ButtonAPI skipButton;
-    private ButtonAPI takeButton;
-    private ButtonAPI doubleButton;
-    private ButtonAPI leaveButton;
 
     // ------------------------------------------------------------------- setup
 
@@ -179,17 +203,17 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
     }
 
     private void createLabels() {
-        tokenLabel = addLabel("", Color.WHITE, 0f, Y_TOKENS, PANEL_W, 18f,
+        tokenLabel = addLabel("", Color.WHITE, 0f, Y_TOKENS, PANEL_W, LABEL_H,
                 Alignment.MID, Fonts.DEFAULT_SMALL);
 
-        costLabel = addLabel("", DIM_TEXT, 0f, Y_COST, PANEL_W, 18f,
+        costLabel = addLabel("", DIM_TEXT, 0f, Y_COST, PANEL_W, LABEL_H,
                 Alignment.MID, Fonts.DEFAULT_SMALL);
 
         addLabel("GAMBLING DEN", TRIM, 0f, Y_CABINET + 14f, PANEL_W, 24f,
                 Alignment.MID, Fonts.ORBITRON_20AA);
 
         for (int i = 0; i < Config.REELS_MAX; i++) {
-            plateLabels.add(addLabel("", DIM_TEXT, 0f, Y_PLATES, 10f, 18f,
+            plateLabels.add(addLabel("", DIM_TEXT, 0f, Y_PLATES, 10f, LABEL_H,
                     Alignment.MID, Fonts.DEFAULT_SMALL));
         }
         layoutPlates();
@@ -197,7 +221,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
         resultLabel = addLabel("", Color.WHITE, 40f, Y_RESULT, PANEL_W - 80f, 42f,
                 Alignment.MID, Fonts.DEFAULT_SMALL);
 
-        hintLabel = addLabel("", new Color(125, 130, 148), 0f, Y_HINT, PANEL_W, 18f,
+        hintLabel = addLabel("", new Color(125, 130, 148), 0f, Y_HINT, PANEL_W, LABEL_H,
                 Alignment.MID, Fonts.DEFAULT_SMALL);
     }
 
@@ -207,90 +231,87 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
         float left = stripLeft();
         for (int i = 0; i < plateLabels.size(); i++) {
             LabelAPI label = plateLabels.get(i);
+            label.setText("");
             if (i < reelCount) {
-                label.getPosition().inTL(left + i * (rw + REEL_GAP), Y_PLATES).setSize(rw, 18f);
+                label.getPosition().inTL(left + i * (rw + REEL_GAP), Y_PLATES).setSize(rw, LABEL_H);
             } else {
-                label.setText("");
-                label.getPosition().inTL(-500f, Y_PLATES).setSize(rw, 18f);
+                label.getPosition().inTL(-500f, Y_PLATES).setSize(rw, LABEL_H);
             }
         }
     }
 
-    /**
-     * Every button on the machine, in one element that covers the whole panel.
-     *
-     * The covering matters. An element added at an offset renders where you put it but is not
-     * hit-tested there, so its buttons look right and do nothing at all. Full panel size at the
-     * top left, with each button placed inside it, is the arrangement that actually takes clicks.
-     */
+    private Btn addButton(String action, String caption, float x, float y, float w, float h) {
+        Btn button = new Btn(action, x, y, w, h);
+        button.label = addLabel(caption, BTN_TEXT, x, y + (h - LABEL_H) / 2f, w, LABEL_H,
+                Alignment.MID, Fonts.DEFAULT_SMALL);
+        buttons.add(button);
+        return button;
+    }
+
     private void createButtons() {
-        TooltipMakerAPI holder = panel.createUIElement(PANEL_W, PANEL_H, false);
-        holder.setActionListenerDelegate(this);
-        panel.addUIElement(holder).inTL(0f, 0f);
-
-        Color base = Global.getSettings().getBasePlayerColor();
-        Color bg = Global.getSettings().getDarkPlayerColor();
-        Color bright = Global.getSettings().getBrightPlayerColor();
-
         // --- how many reels, and at what stakes
-        float reelBtnW = 40f;
-        float stakeBtnW = 74f;
+        float reelBtnW = 42f;
+        float stakeBtnW = 76f;
         float small = 5f;
         float reelsW = Config.REELS_MAX * reelBtnW + (Config.REELS_MAX - 1) * small;
         float stakesW = Config.STAKE_COUNT * stakeBtnW + (Config.STAKE_COUNT - 1) * small;
-        float total = 68f + reelsW + 39f + 74f + stakesW;
+        float total = 68f + reelsW + 40f + 74f + stakesW;
         float x = (PANEL_W - total) / 2f;
 
-        addLabel("Reels", DIM_TEXT, x, Y_SETUP + 5f, 60f, 18f, Alignment.RMID, Fonts.DEFAULT_SMALL);
+        addLabel("Reels", DIM_TEXT, x, Y_SETUP + (H_SETUP - LABEL_H) / 2f, 60f, LABEL_H,
+                Alignment.RMID, Fonts.DEFAULT_SMALL);
         x += 68f;
         for (int i = 1; i <= Config.REELS_MAX; i++) {
-            ButtonAPI button = holder.addAreaCheckbox(Integer.toString(i), ACT_REELS + i,
-                    base, bg, bright, reelBtnW, H_SETUP, 0f);
-            button.getPosition().inTL(x, Y_SETUP);
-            reelButtons.add(button);
+            addButton(ACT_REELS + i, Integer.toString(i), x, Y_SETUP, reelBtnW, H_SETUP);
             x += reelBtnW + small;
         }
 
-        x += 39f - small;
-        addLabel("Stakes", DIM_TEXT, x, Y_SETUP + 5f, 66f, 18f, Alignment.RMID, Fonts.DEFAULT_SMALL);
+        x += 40f - small;
+        addLabel("Stakes", DIM_TEXT, x, Y_SETUP + (H_SETUP - LABEL_H) / 2f, 66f, LABEL_H,
+                Alignment.RMID, Fonts.DEFAULT_SMALL);
         x += 74f;
         for (int i = 0; i < Config.STAKE_COUNT; i++) {
-            ButtonAPI button = holder.addAreaCheckbox(Config.stakeName(i), ACT_STAKE + i,
-                    base, bg, bright, stakeBtnW, H_SETUP, 0f);
-            button.getPosition().inTL(x, Y_SETUP);
-            stakeButtons.add(button);
+            addButton(ACT_STAKE + i, Config.stakeName(i), x, Y_SETUP, stakeBtnW, H_SETUP);
             x += stakeBtnW + small;
         }
 
-        // --- what you can do. All of them are always on screen; the ones that do not apply
-        // right now are greyed out rather than hidden, so nothing moves under the cursor.
+        // --- what you can do. All of them stay on screen; the ones that do not apply right now
+        // are greyed out rather than hidden, so nothing moves under the cursor.
         float gap = 14f;
-        float[] widths = { 170f, 110f, 150f, 210f, 130f };
+        float[] widths = { 176f, 110f, 150f, 210f, 130f };
         float actionsW = gap * (widths.length - 1);
         for (float w : widths) actionsW += w;
         float ax = (PANEL_W - actionsW) / 2f;
 
-        pullButton = action(holder, "Pull", ACT_PULL, ax, widths[0]);
+        pullButton = addButton(ACT_PULL, "Pull", ax, Y_ACTIONS, widths[0], H_ACTION);
         ax += widths[0] + gap;
-        skipButton = action(holder, "Skip", ACT_SKIP, ax, widths[1]);
+        addButton(ACT_SKIP, "Skip", ax, Y_ACTIONS, widths[1], H_ACTION);
         ax += widths[1] + gap;
-        takeButton = action(holder, "Take it", ACT_TAKE, ax, widths[2]);
+        addButton(ACT_TAKE, "Take it", ax, Y_ACTIONS, widths[2], H_ACTION);
         ax += widths[2] + gap;
-        doubleButton = action(holder, "Double or nothing", ACT_DOUBLE, ax, widths[3]);
+        addButton(ACT_DOUBLE, "Double or nothing", ax, Y_ACTIONS, widths[3], H_ACTION);
         ax += widths[3] + gap;
-        leaveButton = action(holder, "Leave", ACT_LEAVE, ax, widths[4]);
+        addButton(ACT_LEAVE, "Leave", ax, Y_ACTIONS, widths[4], H_ACTION);
     }
 
-    private ButtonAPI action(TooltipMakerAPI holder, String text, String data, float x, float w) {
-        ButtonAPI button = holder.addButton(text, data, w, H_ACTION, 0f);
-        button.getPosition().inTL(x, Y_ACTIONS);
-        button.setQuickMode(true);
-        return button;
+    private Btn find(String action) {
+        for (Btn button : buttons) {
+            if (button.action.equals(action)) return button;
+        }
+        return null;
+    }
+
+    private void setState(String action, boolean enabled, boolean checked) {
+        Btn button = find(action);
+        if (button == null) return;
+        button.enabled = enabled;
+        button.checked = checked;
+        button.label.setColor(enabled ? (checked ? Color.WHITE : BTN_TEXT) : BTN_TEXT_OFF);
     }
 
     // ------------------------------------------------------------------ chrome
 
-    /** Brings every label and button in line with whatever is happening. */
+    /** Brings every label and control in line with whatever is happening. */
     private void refresh() {
         int tokens = TokenBank.getTokens();
         int cost = SlotMachine.costOf(reelCount, stake);
@@ -300,28 +321,25 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
                 + "  -  " + Config.STAKE_COST[stake] + " a reel at "
                 + Config.stakeName(stake).toLowerCase() + " stakes");
 
-        // The machine can only be reset between pulls - not mid-spin, and not while a
-        // payout is still sitting on the table waiting to be taken or risked.
-        boolean canSetUp = state == State.READY;
-        for (int i = 0; i < reelButtons.size(); i++) {
-            reelButtons.get(i).setChecked(i + 1 == reelCount);
-            reelButtons.get(i).setEnabled(canSetUp);
-        }
-        for (int i = 0; i < stakeButtons.size(); i++) {
-            stakeButtons.get(i).setChecked(i == stake);
-            stakeButtons.get(i).setEnabled(canSetUp);
-        }
-
         boolean ready = state == State.READY;
         boolean spinning = state == State.SPINNING;
         boolean offering = state == State.OFFER;
 
-        pullButton.setText("Pull  (" + cost + ")");
-        pullButton.setEnabled(ready && tokens >= cost);
-        skipButton.setEnabled(spinning);
-        takeButton.setEnabled(offering);
-        doubleButton.setEnabled(offering);
-        leaveButton.setEnabled(!spinning);
+        // The machine can only be reset between pulls: not mid-spin, and not while a payout is
+        // still on the table. Picking one setting always clears the others - they are one choice.
+        for (int i = 1; i <= Config.REELS_MAX; i++) {
+            setState(ACT_REELS + i, ready, i == reelCount);
+        }
+        for (int i = 0; i < Config.STAKE_COUNT; i++) {
+            setState(ACT_STAKE + i, ready, i == stake);
+        }
+
+        pullButton.label.setText("Pull  (" + cost + ")");
+        setState(ACT_PULL, ready && tokens >= cost, false);
+        setState(ACT_SKIP, spinning, false);
+        setState(ACT_TAKE, offering, false);
+        setState(ACT_DOUBLE, offering, false);
+        setState(ACT_LEAVE, !spinning, false);
 
         if (spinning) {
             hintLabel.setText("");
@@ -351,7 +369,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
         resultLabel.setText("");
         for (LabelAPI plate : plateLabels) plate.setText("");
 
-        Global.getSoundPlayer().playUISound(SOUND_PULL, 1f, 1f);
+        Global.getSoundPlayer().playUISound(SOUND_CLICK, 1f, 1f);
         refresh();
     }
 
@@ -416,15 +434,17 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
             held = null;
             resultLabel.setText("The machine keeps the lot.");
             resultLabel.setColor(new Color(220, 110, 110));
-            Global.getSoundPlayer().playUISound(SOUND_LOSE, 1f, 1f);
+            Global.getSoundPlayer().playUISound(SOUND_DENIED, 1f, 1f);
             state = State.READY;
         }
         refresh();
     }
 
     private void leave() {
+        if (dismissed) return;
         // Never let a won payout be walked away from by accident.
         if (held != null) takeWinnings();
+        dismissed = true;
         if (callbacks != null) callbacks.dismissDialog();
     }
 
@@ -445,41 +465,25 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
         refresh();
     }
 
-    // ------------------------------------------------------------------- input
-
-    @Override
-    public void actionPerformed(Object data, Object source) {
-        handle(data);
+    private void skipAnimation() {
+        if (state != State.SPINNING) return;
+        for (Reel reel : reels) reel.snapToResult();
+        reelsStopped = reels.size();
     }
 
-    /** The other route the game can deliver a button press by. Same destination. */
-    @Override
-    public void buttonPressed(Object buttonId) {
-        handle(buttonId);
-    }
-
-    private void handle(Object data) {
-        if (!(data instanceof String)) return;
-        String action = (String) data;
-
+    private void act(String action) {
         if (ACT_PULL.equals(action)) {
-            if (state == State.READY) startSpin();
-
+            startSpin();
         } else if (ACT_SKIP.equals(action)) {
             skipAnimation();
-
         } else if (ACT_TAKE.equals(action)) {
             takeWinnings();
-
         } else if (ACT_DOUBLE.equals(action)) {
             doubleOrNothing();
-
         } else if (ACT_LEAVE.equals(action)) {
             leave();
-
         } else if (action.startsWith(ACT_REELS)) {
             setReels(parse(action.substring(ACT_REELS.length()), reelCount));
-
         } else if (action.startsWith(ACT_STAKE)) {
             setStake(parse(action.substring(ACT_STAKE.length()), stake));
         }
@@ -493,38 +497,97 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
         }
     }
 
+    // ------------------------------------------------------------------- input
+
+    /** Where the cursor is, in the panel's own top-left-origin coordinates. */
+    private float mouseX() {
+        float scale = Global.getSettings().getScreenScaleMult();
+        return Mouse.getX() / scale - p.getX();
+    }
+
+    private float mouseY() {
+        float scale = Global.getSettings().getScreenScaleMult();
+        return p.getY() + PANEL_H - Mouse.getY() / scale;
+    }
+
+    private boolean contains(Btn button, float mx, float my) {
+        return mx >= button.x && mx <= button.x + button.w
+                && my >= button.y && my <= button.y + button.h;
+    }
+
+    /**
+     * Mouse handling lives here rather than in processInput because advance() is the callback
+     * this panel is known to receive - the reels animate, so it runs.
+     */
+    private void pollMouse() {
+        if (p == null || dismissed) return;
+
+        float mx = mouseX();
+        float my = mouseY();
+
+        for (Btn button : buttons) {
+            button.hovered = button.enabled && contains(button, mx, my);
+        }
+
+        boolean down = Mouse.isButtonDown(0);
+        boolean clicked = down && !wasMouseDown;
+        wasMouseDown = down;
+        if (!clicked) return;
+
+        for (Btn button : buttons) {
+            if (!contains(button, mx, my)) continue;
+            if (!button.enabled) {
+                Global.getSoundPlayer().playUISound(SOUND_DENIED, 1f, 1f);
+                return;
+            }
+            Global.getSoundPlayer().playUISound(SOUND_CLICK, 1f, 1f);
+            act(button.action);
+            return;
+        }
+
+        // A click anywhere on the cabinet while it is running means "get on with it".
+        if (state == State.SPINNING) skipAnimation();
+    }
+
+    /** Keyboard shortcuts. Every one of these has a button too; none of them is the only way. */
     @Override
     public void processInput(List<InputEventAPI> events) {
         if (events == null) return;
         for (InputEventAPI event : events) {
-            if (event.isConsumed()) continue;
+            if (event.isConsumed() || !event.isKeyDownEvent()) continue;
 
-            // Escape always gets you out, whatever else is going on. Being stuck in here is
-            // worse than anything else this panel could get wrong.
-            if (event.isKeyDownEvent() && event.getEventValue() == Keyboard.KEY_ESCAPE) {
+            int key = event.getEventValue();
+            if (key == Keyboard.KEY_ESCAPE) {
                 event.consume();
                 leave();
                 return;
             }
-
-            if (state == State.READY && event.isKeyDownEvent()
-                    && event.getEventValue() == Keyboard.KEY_SPACE && pullButton.isEnabled()) {
+            if (key == Keyboard.KEY_SPACE || key == Keyboard.KEY_RETURN) {
                 event.consume();
-                startSpin();
+                if (state == State.OFFER) takeWinnings();
+                else if (state == State.SPINNING) skipAnimation();
+                else startSpin();
+                continue;
+            }
+            if (key == Keyboard.KEY_D && state == State.OFFER) {
+                event.consume();
+                doubleOrNothing();
+                continue;
+            }
+            int digit = key - Keyboard.KEY_1 + 1;
+            if (digit >= 1 && digit <= Config.REELS_MAX) {
+                event.consume();
+                setReels(digit);
             }
         }
-    }
-
-    private void skipAnimation() {
-        if (state != State.SPINNING) return;
-        for (Reel reel : reels) reel.snapToResult();
-        reelsStopped = reels.size();
     }
 
     // ----------------------------------------------------------------- ticking
 
     @Override
     public void advance(float amount) {
+        pollMouse();
+
         stateTimer += amount;
         lightTimer += amount;
         while (lightTimer >= LIGHT_STEP_TIME) {
@@ -627,7 +690,35 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin implements ActionL
 
         drawPayLine(left, stripWidth(), windowY, alphaMult);
 
+        for (Btn button : buttons) {
+            drawButton(button, alphaMult);
+        }
+
         GL11.glPopAttrib();
+    }
+
+    private void drawButton(Btn button, float alphaMult) {
+        float x = glX(button.x);
+        float y = glY(button.y, button.h);
+
+        Color fill;
+        Color border;
+        if (!button.enabled) {
+            fill = BTN_FILL_OFF;
+            border = new Color(40, 46, 56);
+        } else if (button.checked) {
+            fill = BTN_FILL_ON;
+            border = GLDraw.brighten(TRIM, 0.4f);
+        } else if (button.hovered) {
+            fill = BTN_FILL_HOVER;
+            border = TRIM;
+        } else {
+            fill = BTN_FILL;
+            border = GLDraw.darken(TRIM, 0.45f);
+        }
+
+        GLDraw.bevelledPanel(x, y, button.w, button.h, fill, 3f, alphaMult);
+        GLDraw.frame(x, y, button.w, button.h, border, 1.5f, alphaMult);
     }
 
     private void drawCabinet(float x, float y, float w, float h, float alphaMult) {
