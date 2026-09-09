@@ -1,7 +1,6 @@
 package gamblingden.slots;
 
 import java.awt.Color;
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -9,7 +8,6 @@ import java.util.Map;
 import java.util.Random;
 
 import org.lwjgl.input.Keyboard;
-import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
@@ -133,7 +131,6 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     private CustomPanelAPI panel;
     private DialogCallbacks callbacks;
     private PositionAPI p;
-    private final IntBuffer clipRect = BufferUtils.createIntBuffer(16);
 
     private final Random random = new Random();
     private final List<Reel> reels = new ArrayList<Reel>();
@@ -802,17 +799,15 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     }
 
     private void clipWindow(float x, float y, float w, float h) {
+        // This is a fixed, non-scrolling modal panel. Clip to its known bounds, without
+        // reading GL state: glIsEnabled/glGetInteger force Fast Rendering to synchronize
+        // every reel, every frame, eventually triggering "Asynchronous pipeline stall".
+        // drawReel's attribute stack preserves and restores the enclosing UI's scissor.
         float scale = Global.getSettings().getScreenScaleMult();
-        int left = (int) Math.floor(x * scale), bottom = (int) Math.floor(y * scale);
-        int right = (int) Math.ceil((x + w) * scale), top = (int) Math.ceil((y + h) * scale);
-        if (GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)) {
-            clipRect.clear();
-            GL11.glGetInteger(GL11.GL_SCISSOR_BOX, clipRect);
-            left = Math.max(left, clipRect.get(0));
-            bottom = Math.max(bottom, clipRect.get(1));
-            right = Math.min(right, clipRect.get(0) + clipRect.get(2));
-            top = Math.min(top, clipRect.get(1) + clipRect.get(3));
-        }
+        int left = (int) Math.floor(Math.max(x, p.getX()) * scale);
+        int bottom = (int) Math.floor(Math.max(y, p.getY()) * scale);
+        int right = (int) Math.ceil(Math.min(x + w, p.getX() + p.getWidth()) * scale);
+        int top = (int) Math.ceil(Math.min(y + h, p.getY() + p.getHeight()) * scale);
         GL11.glEnable(GL11.GL_SCISSOR_TEST);
         GL11.glScissor(left, bottom, Math.max(0, right - left), Math.max(0, top - bottom));
     }

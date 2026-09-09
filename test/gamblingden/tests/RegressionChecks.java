@@ -275,12 +275,16 @@ public class RegressionChecks {
         check(ShipTradeIn.tradeIn(alpha)==0 && ShipTradeIn.tradeIn(flag)==0,"Stale ship/flagship sold");
         check(TokenBank.getTokens()==29 && guns.get("gun")==2,"Repeated sale paid twice");
     }
-    private static SlotMachinePanel machine() {
-        SlotMachinePanel panel=new SlotMachinePanel();
+    private static SlotMachinePanel machine() throws Exception {
+        return (SlotMachinePanel) machine(SlotMachinePanel.class);
+    }
+    private static BaseCustomUIPanelPlugin machine(Class<?> type) throws Exception {
+        BaseCustomUIPanelPlugin panel=(BaseCustomUIPanelPlugin)type.getConstructor().newInstance();
         CustomPanelAPI ui=proxy(CustomPanelAPI.class,(m,a)->m.getName().equals("addComponent") ? position : null);
-        panel.init(ui,proxy(CustomVisualDialogDelegate.DialogCallbacks.class,(m,a)->{
+        var callbacks=proxy(CustomVisualDialogDelegate.DialogCallbacks.class,(m,a)->{
             if(m.getName().equals("dismissDialog")) dismissals++; return null;
-        }));
+        });
+        type.getMethod("init",CustomPanelAPI.class,CustomVisualDialogDelegate.DialogCallbacks.class).invoke(panel,ui,callbacks);
         panel.positionChanged(position); return panel;
     }
     private static InputEventAPI key(int code) {
@@ -319,12 +323,16 @@ public class RegressionChecks {
         Pbuffer buffer=new Pbuffer(1200,800,new PixelFormat(),null);
         try {
             buffer.makeCurrent();
-            for(boolean clipped:new boolean[]{false,true}) {
+            for(int reelCount=1;reelCount<=5;reelCount++) {
+              invoke(panel,"act",String.class,"reels:"+reelCount);
+              for(boolean clipped:new boolean[]{false,true}) {
                 if(clipped) GL11.glEnable(GL11.GL_SCISSOR_TEST); else GL11.glDisable(GL11.GL_SCISSOR_TEST);
                 GL11.glScissor(15,20,1100,700); panel.renderBelow(1f);
                 IntBuffer rect=BufferUtils.createIntBuffer(16); GL11.glGetInteger(GL11.GL_SCISSOR_BOX,rect);
                 check(GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)==clipped && rect.get(0)==15 && rect.get(1)==20
                         && rect.get(2)==1100 && rect.get(3)==700,"Renderer leaked clipping state");
+                check(GL11.glGetError()==GL11.GL_NO_ERROR,"Renderer produced an OpenGL error");
+              }
             }
         } finally { buffer.destroy(); }
     }
@@ -357,7 +365,11 @@ public class RegressionChecks {
         }
     }
     public static void main(String[] args) throws Exception {
+        if(args.length>0 && args[0].equals("fast-renderer")) {
+            setup(); FastRendererChecks.run(RegressionChecks::machine); return;
+        }
         setup(); reels(); prizes(); ships(); ui(); legacy(); odds();
+        FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }
 }

@@ -73,6 +73,16 @@ offscreen graphics; they do not open or change a live game. The graphics checks 
 game's Windows native libraries. Run `./gradlew releaseZip` to check, build and package the mod
 with both icon sizes into `GamblingDen.zip`.
 
+If `fr.jar` is installed in `starsector-core`, the checks also send 600 panel frames through
+its actual graphics bridge and verify that the old crash condition is detected. This uses
+an offscreen context, not a running campaign.
+
+## Changes in 0.4.3
+
+Fixes the fatal "Asynchronous pipeline stall" introduced in 0.4.2 when using Fast Rendering.
+Reel clipping no longer reads graphics state each frame. The panel still restores the
+surrounding UI's clipping state after drawing. Rewards, odds and ship prices are unchanged.
+
 ## Changes in 0.4.2
 
 Hullmod boxes now make up 12%, 24% and 32% of winning symbols at low, mid and high stakes.
