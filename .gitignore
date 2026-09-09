@@ -5,3 +5,4 @@ gradle.properties
 # case-insensitive Windows filesystems.
 /GamblingDen/
 /GamblingDen.zip
+/GamblingDen-*.zip

@@ -16,12 +16,12 @@ import gamblingden.blackjack.BlackjackGame.*;
 import gamblingden.economy.TokenBank;
 import gamblingden.ui.GLDraw;
 
-/** Original, mouse-first table and geometric card art. No casino assets or runtime dependency. */
+/** Mouse-first table with the full-card artwork and sprite approach used by Interastral. */
 public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
     public static final float PANEL_W = 1000, PANEL_H = 660;
     private static final Color BG = new Color(10, 15, 23), FELT = new Color(19, 53, 48);
     private static final Color GOLD = new Color(255, 205, 105), DIM = new Color(145, 165, 165);
-    private static final Color INK = new Color(28, 33, 44), RED = new Color(182, 48, 52);
+    private final CardArt cardArt=new CardArt();
     private final BlackjackGame game = new BlackjackGame(new Account() {
         public int balance() { return TokenBank.getTokens(); }
         public boolean take(int amount) { return TokenBank.spendTokens(amount); }
@@ -46,13 +46,14 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
         boolean contains(float x, float y) { return x>=this.x && x<=this.x+w && y>=this.y && y<=this.y+h; }
     }
     private static final class Face {
-        String rankText = "";
+        String spritePath = "";
         Card card;
         boolean visible, hidden;
         float x, y, w, h;
     }
     public void init(CustomPanelAPI panel, DialogCallbacks callbacks) {
         this.panel=panel; this.callbacks=callbacks;
+        cardArt.load();
         wasMouseDown=Mouse.isCreated() && Mouse.isButtonDown(0);
         label("BLACKJACK",GOLD,0,18,PANEL_W,26,Fonts.ORBITRON_20AA);
         bank=label("",Color.WHITE,0,48,PANEL_W,18,Fonts.DEFAULT_SMALL);
@@ -96,7 +97,8 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
         bank.setText(TokenBank.getTokens()+" tokens" + (game.playing()?"  |  On table: "+game.invested():""));
         dealerLabel.setText("Dealer"+(game.dealer().cards().isEmpty() || !game.holeRevealed()?"":" - "+game.dealer().value()
                 +(game.dealer().soft()?" (soft)":"")));
-        result.setText(game.state()==State.DEALER ? "Dealer's turn" : game.result());
+        result.setText(!cardArt.isReady() ? "Card artwork is missing. Reinstall Gambling Den."
+                : game.state()==State.DEALER ? "Dealer's turn" : game.result());
         result.setColor(game.state()==State.RESULT && game.paid()<game.invested() ? new Color(239,125,113) : GOLD);
         betLabel.setText("Bet: "+bet+" tokens"+(!game.playing() && !game.canDeal(bet)
                 ? (TokenBank.getTokens()<bet?"  |  Not enough tokens":"  |  Token balance limit") : ""));
@@ -114,7 +116,7 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
             b.checked=b.action.equals("bet:"+bet);
             if(b.action.startsWith("bet:")) { int next=proposedBet(b.action); b.enabled=!game.playing() && next>=2 && next<=1000; }
             else b.enabled=switch(b.action) {
-                case "deal" -> game.canDeal(bet);
+                case "deal" -> cardArt.isReady() && game.canDeal(bet);
                 case "hit","stand" -> game.state()==State.PLAYER;
                 case "double" -> game.canDouble(); case "split" -> game.canSplit(); default -> true;
             };
@@ -128,16 +130,18 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
         }
     }
     private void arrange(int group, List<Card> cards, float left, float top, float width, boolean hideHole) {
-        for(Face face:faces[group]) { face.visible=false; face.rankText=""; }
+        for(Face face:faces[group]) { face.visible=false; face.spritePath=""; }
         int count=Math.max(1,cards.size()), columns=count>10?(count+1)/2:count;
-        float w=count>10?58:86, h=count>10?66:116;
+        float w=count>10?72:96, h=w*CardArt.HEIGHT_PER_WIDTH;
         for(int i=0;i<count;i++) {
             int row=i/columns, column=i%columns, rowCount=Math.min(columns,count-row*columns);
             float step=rowCount<=1?0:Math.min(w+10,(width-w)/(rowCount-1));
             Face face=faces[group][i]; face.visible=true; face.card=cards.isEmpty()?null:cards.get(i);
             face.hidden=hideHole && i==1; face.x=left+(width-w-step*(rowCount-1))/2+column*step;
-            face.y=top+row*(h+6); face.w=w; face.h=h;
-            face.rankText=face.hidden || face.card==null?"":face.card.symbol();
+            // In rare long hands, overlap two rows below their rank corners instead of
+            // squeezing the whole card into a short rectangle and distorting the print.
+            face.y=top+row*(count>10?35:h+6); face.w=w; face.h=h;
+            face.spritePath=face.card==null?"":face.hidden?CardArt.BACK:CardArt.pathFor(face.card);
         }
     }
     private void act(String action) {
@@ -152,7 +156,7 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
             bet=next; game.clearResult();
         } else {
             boolean acted=switch(action) {
-                case "deal" -> game.deal(bet); case "hit" -> game.hit(); case "stand" -> game.stand();
+                case "deal" -> cardArt.isReady() && game.deal(bet); case "hit" -> game.hit(); case "stand" -> game.stand();
                 case "double" -> game.doubleDown(); case "split" -> game.split(); default -> false;
             };
             if(acted) { dealerTimer=0; Global.getSoundPlayer().playUISound("ui_button_pressed",1,.5f); }
@@ -196,7 +200,6 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
     private float y(float n) { return position.getY()+PANEL_H-n; }
     private void rect(float x,float y,float w,float h,Color c,float a) { GLDraw.quad(x(x),y(y+h),w,h,c,a); }
     private void frame(float x,float y,float w,float h,Color c,float a) { GLDraw.frame(x(x),y(y+h),w,h,c,2,a); }
-    private static Color ink(Card c) { return c.suit()==Suit.HEARTS || c.suit()==Suit.DIAMONDS?RED:INK; }
     @Override public void renderBelow(float alpha) {
         if(position==null) return;
         // Only write GL state. Synchronous queries crash the user's Fast Rendering bridge.
@@ -221,40 +224,6 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
     private void drawCard(Face f,float a) {
         if(f.card==null) { frame(f.x,f.y,f.w,f.h,DIM,a*.25f); return; }
         rect(f.x+3,f.y+4,f.w,f.h,Color.BLACK,a*.35f);
-        rect(f.x,f.y,f.w,f.h,new Color(242,234,215),a);
-        if(f.hidden) {
-            rect(f.x+4,f.y+4,f.w-8,f.h-8,new Color(47,67,94),a);
-            for(float yy=f.y+12;yy<f.y+f.h-8;yy+=12) for(float xx=f.x+12;xx<f.x+f.w-8;xx+=12)
-                diamond(xx,yy,2,GOLD,a*.6f);
-            frame(f.x+7,f.y+7,f.w-14,f.h-14,GOLD,a*.65f);
-        } else {
-            CardRanks.draw(f.rankText,x(f.x+8),y(f.y+8),f.h>80?22:17,ink(f.card),a);
-            suit(f.card.suit(),f.x+f.w/2,f.y+f.h*.57f,Math.min(18,f.h*.2f),ink(f.card),a);
-            if(f.h>80) suit(f.card.suit(),f.x+15,f.y+43,5,ink(f.card),a);
-        }
-    }
-    private void triangle(float ax,float ay,float bx,float by,float cx,float cy,Color c,float a) {
-        GL11.glColor4f(c.getRed()/255f,c.getGreen()/255f,c.getBlue()/255f,a);
-        GL11.glBegin(GL11.GL_TRIANGLES);
-        GL11.glVertex2f(x(ax),y(ay)); GL11.glVertex2f(x(bx),y(by)); GL11.glVertex2f(x(cx),y(cy)); GL11.glEnd();
-    }
-    private void diamond(float cx,float cy,float r,Color c,float a) {
-        triangle(cx-r*.75f,cy,cx,cy-r,cx+r*.75f,cy,c,a);
-        triangle(cx-r*.75f,cy,cx,cy+r,cx+r*.75f,cy,c,a);
-    }
-    private void suit(Suit suit,float cx,float cy,float r,Color c,float a) {
-        if(suit==Suit.DIAMONDS) { diamond(cx,cy,r,c,a); return; }
-        if(suit==Suit.CLUBS) {
-            GLDraw.circle(x(cx),y(cy-r*.55f),r*.48f,c,a,18);
-            GLDraw.circle(x(cx-r*.48f),y(cy+r*.05f),r*.48f,c,a,18);
-            GLDraw.circle(x(cx+r*.48f),y(cy+r*.05f),r*.48f,c,a,18);
-        } else {
-            float flip=suit==Suit.HEARTS?1:-1;
-            GLDraw.circle(x(cx-r*.42f),y(cy-flip*r*.32f),r*.52f,c,a,18);
-            GLDraw.circle(x(cx+r*.42f),y(cy-flip*r*.32f),r*.52f,c,a,18);
-            triangle(cx-r*.93f,cy-flip*r*.12f,cx+r*.93f,cy-flip*r*.12f,cx,cy+flip*r,c,a);
-            if(suit==Suit.HEARTS) return;
-        }
-        triangle(cx,cy,cx-r*.4f,cy+r,cx+r*.4f,cy+r,c,a);
+        cardArt.draw(f.spritePath,x(f.x),y(f.y+f.h),f.w,f.h,a);
     }
 }

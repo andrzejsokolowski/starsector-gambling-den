@@ -57,3 +57,12 @@ Closing stands on remaining hands and resolves the dealer once.
 The table and card drawings use new code, with no imported artwork or asset dependencies.
 `THIRD_PARTY_NOTICES.txt` contains the source attribution and original non-commercial code notice.
 Tests cover the three source issues above, token accounting, split doubles, exits, and the graphics bridge.
+
+## Card display in 1.3.1
+
+The user rejected both the interface-font ranks and the custom vector ranks.
+CardArt now follows CardSprites and renderCardFaceUp/renderCardFaceDown from CardRenderingUtils.
+The deck uses unchanged upstream SVG-cards 2x PNG exports and keeps its aspect ratio.
+The release includes the complete source SVGs, original author list, README, and LGPL-2.1 text.
+Private asset paths avoid collisions with Interastral. No runtime casino dependency is needed.
+The old CardRanks helper is removed. No card rank uses a Starsector LabelAPI.

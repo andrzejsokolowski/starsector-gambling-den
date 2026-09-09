@@ -49,11 +49,12 @@ public class RegressionChecks {
     private static PositionAPI position;
     private static CargoAPI cargo;
     private static InteractionDialogPlugin currentDialog;
-    private record DrawnIcon(String path, float x, float y, float alpha) { }
+    private record DrawnIcon(String path, float x, float y, float alpha, float width, float height) { }
     private static final List<DrawnIcon> drawnIcons = new ArrayList<>();
     private static boolean recordIcons;
     private static boolean forbidRewards;
     private static int hullScans, cargoScans, weaponRollSetup, weaponWrites;
+    private static int cardLoads;
 
     private static void rewardWork() {
         if (forbidRewards) throw new AssertionError("Reward generation/cargo access while Pachinko is open");
@@ -102,12 +103,13 @@ public class RegressionChecks {
         });
     }
     private static SpriteAPI sprite(String path) {
-        float[] alpha={1f};
+        float[] alpha={1f},size={80,80};
         return proxy(SpriteAPI.class,(m,a)->switch(m.getName()) {
             case "getTextureId" -> 1;
             case "getWidth", "getHeight" -> 80f;
             case "setAlphaMult" -> { alpha[0]=(Float)a[0]; yield null; }
-            case "renderAtCenter" -> { drawnIcons.add(new DrawnIcon(path,(Float)a[0],(Float)a[1],alpha[0])); yield null; }
+            case "setSize" -> { size[0]=(Float)a[0];size[1]=(Float)a[1];yield null; }
+            case "renderAtCenter" -> { if(recordIcons) drawnIcons.add(new DrawnIcon(path,(Float)a[0],(Float)a[1],alpha[0],size[0],size[1])); yield null; }
             default -> null;
         });
     }
@@ -118,6 +120,7 @@ public class RegressionChecks {
         forbidRewards=false; hullScans=cargoScans=weaponRollSetup=weaponWrites=0;
         WeaponPool.clearCache();
         FighterPool.clearCache(); fighterSpecs.clear(); specialItems.clear(); commodities.clear(); storyPoints=0;
+        cardLoads=0;
     }
     private static void setup() {
         position = proxy(PositionAPI.class,(m,a) -> switch(m.getName()) {
@@ -193,7 +196,8 @@ public class RegressionChecks {
             case "getAllBarEventSpecs" -> new ArrayList<>();
             case "getHullModSpec" -> hullmods.stream().filter(s->s.getId().equals(a[0])).findFirst().orElse(null);
             case "getScreenScaleMult" -> 1f;
-            case "getSprite" -> recordIcons ? sprite((String)a[0]) : null;
+            case "getSprite" -> recordIcons || ((String)a[0]).startsWith(gamblingden.blackjack.CardArt.ROOT) ? sprite((String)a[0]) : null;
+            case "loadTexture" -> { if(((String)a[0]).startsWith(gamblingden.blackjack.CardArt.ROOT)) cardLoads++;yield null; }
             case "createLabel" -> { labelCaptions.add((String)a[0]); yield label(); }
             default -> null;
         }));
@@ -881,7 +885,7 @@ public class RegressionChecks {
         check(game.hands().isEmpty() && ((LabelAPI)get(panel,"result")).getText().isEmpty(),"Bet change retained stale result");
         BlackjackChecks.rig(game,10,6,2,10,4,10); invoke(panel,"act",String.class,"deal");
         Object[][] faces=(Object[][])get(panel,"faces");
-        check((Boolean)get(faces[0][1],"hidden") && ((String)get(faces[0][1],"rankText")).isEmpty(),"Dealer hole card leaked");
+        check((Boolean)get(faces[0][1],"hidden") && get(faces[0][1],"spritePath").equals(gamblingden.blackjack.CardArt.BACK),"Dealer hole card leaked");
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{265f,625f,false});
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{265f,625f,true});
         check(game.hands().get(0).cards().size()==3,"Blackjack Hit mouse button failed");
@@ -889,7 +893,7 @@ public class RegressionChecks {
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{425f,625f,true});
         for(int frame=0;frame<200;frame++) panel.advance(1f/60);
         check(TokenBank.getTokens()==142 && !(Boolean)get(faces[0][1],"hidden")
-                && !((String)get(faces[0][1],"rankText")).isEmpty(),"Stand mouse button/dealer reveal failed");
+                && !get(faces[0][1],"spritePath").equals(gamblingden.blackjack.CardArt.BACK),"Stand mouse button/dealer reveal failed");
     }
 
     @SuppressWarnings("unchecked")
@@ -972,6 +976,73 @@ public class RegressionChecks {
                 game.finishOnDismissal();
             }
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void blackjackCardArt() throws Exception {
+        var paths=gamblingden.blackjack.CardArt.paths();
+        check(paths.size()==53 && new HashSet<>(paths).size()==53,"Deck is missing or repeats a face");
+        for(String path:paths) {
+            var image=javax.imageio.ImageIO.read(new java.io.File(path));
+            check(image!=null && image.getWidth()>=330 && image.getHeight()>=480,"Card is missing or too small: "+path);
+            check(Math.abs((float)image.getHeight()/image.getWidth()-gamblingden.blackjack.CardArt.HEIGHT_PER_WIDTH)<.01,"Card aspect mismatch");
+        }
+        reset();recordIcons=true;TokenBank.addTokens(1000);
+        var panel=(gamblingden.blackjack.BlackjackPanel)machine(gamblingden.blackjack.BlackjackPanel.class);
+        check(cardLoads==53,"Deck was not preloaded");
+        var game=(gamblingden.blackjack.BlackjackGame)get(panel,"game");
+        BlackjackChecks.rig(game,2,5,3,6,10);
+        invoke(panel,"act",String.class,"deal");
+        var cards=(List<gamblingden.blackjack.BlackjackGame.Card>)get(game.hands().get(0),"cards");
+        Pbuffer buffer=new Pbuffer(1200,800,new PixelFormat(),null);
+        try {
+            buffer.makeCurrent();
+            for(var suit:gamblingden.blackjack.BlackjackGame.Suit.values()) for(int rank=1;rank<=13;rank++) {
+                var card=new gamblingden.blackjack.BlackjackGame.Card(rank,suit);cards.set(0,card);
+                invoke(panel,"refresh",new Class<?>[0],new Object[0]);drawnIcons.clear();panel.renderBelow(.6f);
+                var expected=List.of(gamblingden.blackjack.CardArt.pathFor(game.dealer().cards().get(0)),
+                        gamblingden.blackjack.CardArt.BACK,gamblingden.blackjack.CardArt.pathFor(card),
+                        gamblingden.blackjack.CardArt.pathFor(cards.get(1)));
+                check(drawnIcons.stream().map(DrawnIcon::path).toList().equals(expected),"Drawn deck disagrees with hand or exposes hole card");
+                check(drawnIcons.stream().allMatch(i->i.alpha()==.6f && Math.abs(i.height()/i.width()-gamblingden.blackjack.CardArt.HEIGHT_PER_WIDTH)<.001),
+                        "Card sprite distorted or ignored dialog fade");
+            }
+            check(cardLoads==53,"Card textures loaded during render/hand updates");
+            invoke(panel,"act",String.class,"stand");
+            drawnIcons.clear();panel.renderBelow(1);
+            check(drawnIcons.stream().noneMatch(i->i.path().equals(gamblingden.blackjack.CardArt.BACK)),"Dealer hole did not reveal on stand");
+
+            var split=(gamblingden.blackjack.BlackjackPanel)machine(gamblingden.blackjack.BlackjackPanel.class);
+            var splitGame=(gamblingden.blackjack.BlackjackGame)get(split,"game");
+            BlackjackChecks.rig(splitGame,8,5,8,6,2,3);
+            invoke(split,"act",String.class,"deal");invoke(split,"act",String.class,"split");
+            for(var hand:splitGame.hands()) {
+                var longHand=(List<gamblingden.blackjack.BlackjackGame.Card>)get(hand,"cards");longHand.clear();
+                for(int i=0;i<21;i++) longHand.add(new gamblingden.blackjack.BlackjackGame.Card(1,gamblingden.blackjack.BlackjackGame.Suit.values()[i%4]));
+            }
+            invoke(split,"refresh",new Class<?>[0],new Object[0]);drawnIcons.clear();split.renderBelow(1);
+            check(drawnIcons.size()==44,"Crowded split hand dropped cards");
+            Object[][] faces=(Object[][])get(split,"faces");
+            for(int group=1;group<=2;group++) for(Object face:faces[group]) if((Boolean)get(face,"visible")) {
+                check((Float)get(face,"w")==72 && (Float)get(face,"h")>100,"Crowded rank shrunk into a tiny card");
+                check((Float)get(face,"y")+(Float)get(face,"h")<495,"Crowded cards overlap the result/buttons");
+                check((Float)get(face,"x")>=50 && (Float)get(face,"x")+(Float)get(face,"w")<=950,"Card outside the table");
+            }
+        } finally { buffer.destroy(); }
+        SettingsAPI original=Global.getSettings();
+        try {
+            Global.setSettings(proxy(SettingsAPI.class,(m,a)->{
+                if(m.getName().equals("getSprite") && a[0].equals(gamblingden.blackjack.CardArt.ROOT+"spade_king.png")) return null;
+                return m.invoke(original,a);
+            }));
+            int before=TokenBank.getTokens();
+            var missing=(gamblingden.blackjack.BlackjackPanel)machine(gamblingden.blackjack.BlackjackPanel.class);
+            invoke(missing,"act",String.class,"deal");
+            missing.processInput(List.of(key(Keyboard.KEY_SPACE)));
+            check(TokenBank.getTokens()==before,"Missing art allowed an invisible paid hand");
+            check(((LabelAPI)get(missing,"result")).getText().contains("Card artwork is missing"),"Missing art has no actionable message");
+        } finally { Global.setSettings(original);recordIcons=false; }
+        System.out.println("PASS: all 52 card faces, hidden/revealed dealer, aspect ratio, fade, preload, crowded hands, and missing-art guard.");
     }
 
     private static org.json.JSONObject readJson(String path) throws Exception {
@@ -1139,7 +1210,7 @@ public class RegressionChecks {
         }
         setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
         PachinkoPhysicsChecks.run(); PachinkoPhysicsChecks.multiBall(); pachinko(); pachinkoSettings(); pachinkoBatches();
-        BlackjackChecks.run(); blackjackUI(); expandedRewards(); jackpot();
+        BlackjackChecks.run(); blackjackUI(); blackjackCardArt(); expandedRewards(); jackpot();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }

@@ -18,6 +18,7 @@ import gamblingden.economy.TokenBank;
 
 /** Offscreen layout QA. Draws the real board; system fonts stand in for game label fonts. */
 public final class PachinkoPreview {
+    private static float previewScale=1;
     private static final List<Caption> captions = new ArrayList<>();
     private static final class Caption {
         String text, font;
@@ -59,14 +60,16 @@ public final class PachinkoPreview {
     private static void save(com.fs.starfarer.api.campaign.BaseCustomUIPanelPlugin panel, String name) throws Exception {
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
         panel.renderBelow(1);
-        ByteBuffer pixels=BufferUtils.createByteBuffer(1000*660*4);
-        GL11.glReadPixels(0,0,1000,660,GL11.GL_RGBA,GL11.GL_UNSIGNED_BYTE,pixels);
-        BufferedImage image=new BufferedImage(1000,660,BufferedImage.TYPE_INT_ARGB);
-        for(int y=0;y<660;y++) for(int x=0;x<1000;x++) {
-            int i=(y*1000+x)*4;
-            image.setRGB(x,659-y,0xff000000 | (pixels.get(i)&255)<<16 | (pixels.get(i+1)&255)<<8 | (pixels.get(i+2)&255));
+        int width=Math.round(1000*previewScale),height=Math.round(660*previewScale);
+        ByteBuffer pixels=BufferUtils.createByteBuffer(width*height*4);
+        GL11.glReadPixels(0,0,width,height,GL11.GL_RGBA,GL11.GL_UNSIGNED_BYTE,pixels);
+        BufferedImage image=new BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB);
+        for(int y=0;y<height;y++) for(int x=0;x<width;x++) {
+            int i=(y*width+x)*4;
+            image.setRGB(x,height-1-y,0xff000000 | (pixels.get(i)&255)<<16 | (pixels.get(i+1)&255)<<8 | (pixels.get(i+2)&255));
         }
         Graphics2D g=image.createGraphics();
+        g.scale(previewScale,previewScale);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         for(Caption c:captions) {
             boolean large=Fonts.ORBITRON_20AA.equals(c.font);
@@ -77,7 +80,7 @@ public final class PachinkoPreview {
             g.drawString(c.text,c.x+(c.w-fm.stringWidth(c.text))/2,c.y+fm.getAscent());
         }
         g.dispose();
-        File output=new File("build/"+(panel instanceof PachinkoPanel?"pachinko-":panel instanceof gamblingden.jackpot.JackpotPanel?"jackpot-":"blackjack-")+name+".png"); output.getParentFile().mkdirs();
+        File output=new File("build/"+(panel instanceof PachinkoPanel?"pachinko-":panel instanceof gamblingden.jackpot.JackpotPanel?"jackpot-":"blackjack-")+name+(previewScale==1?"":"-"+previewScale+"x")+".png"); output.getParentFile().mkdirs();
         ImageIO.write(image,"png",output);
         System.out.println(output.getAbsolutePath());
     }
@@ -96,7 +99,10 @@ public final class PachinkoPreview {
             if(m.getName().equals("addComponent")) for(Caption c:captions) if(c.label==a[0]) return c.position;
             return null;
         });
-        if(args.length>0 && args[0].equals("blackjack")) { blackjack(ui); return; }
+        if(args.length>0 && args[0].equals("blackjack")) {
+            if(args.length>1) previewScale=Float.parseFloat(args[1]);
+            blackjack(ui);return;
+        }
         if(args.length>0 && args[0].equals("jackpot")) { jackpot(ui); return; }
         PachinkoPanel panel=new PachinkoPanel(); panel.init(ui,null);
         Caption bounds=new Caption(); bounds.w=1000; bounds.h=660; panel.positionChanged(position(bounds));
@@ -126,14 +132,21 @@ public final class PachinkoPreview {
 
     @SuppressWarnings("unchecked")
     private static void blackjack(CustomPanelAPI ui) throws Exception {
+        SettingsAPI original=Global.getSettings();
+        var images=new java.util.HashMap<String,com.fs.starfarer.api.graphics.SpriteAPI>();
+        Global.setSettings(proxy(new Class<?>[]{SettingsAPI.class},(p,m,a)->{
+            if(m.getName().equals("getSprite") && ((String)a[0]).startsWith(gamblingden.blackjack.CardArt.ROOT))
+                return images.computeIfAbsent((String)a[0],PachinkoPreview::sprite);
+            return m.invoke(original,a);
+        }));
         var panel=new gamblingden.blackjack.BlackjackPanel(); panel.init(ui,null);
         Caption bounds=new Caption(); bounds.w=1000; bounds.h=660; panel.positionChanged(position(bounds));
         Field gameField=panel.getClass().getDeclaredField("game"); gameField.setAccessible(true);
         var game=(gamblingden.blackjack.BlackjackGame)gameField.get(panel);
         Method act=panel.getClass().getDeclaredMethod("act",String.class); act.setAccessible(true);
-        Pbuffer buffer=new Pbuffer(1000,660,new PixelFormat(),null);
+        Pbuffer buffer=new Pbuffer(Math.round(1000*previewScale),Math.round(660*previewScale),new PixelFormat(),null);
         try {
-            buffer.makeCurrent(); GL11.glViewport(0,0,1000,660);
+            buffer.makeCurrent(); GL11.glViewport(0,0,Math.round(1000*previewScale),Math.round(660*previewScale));
             GL11.glMatrixMode(GL11.GL_PROJECTION); GL11.glLoadIdentity(); GL11.glOrtho(0,1000,0,660,-1,1);
             GL11.glMatrixMode(GL11.GL_MODELVIEW); GL11.glLoadIdentity();
             save(panel,"ready");
@@ -143,6 +156,9 @@ public final class PachinkoPreview {
             act.invoke(panel,"double"); save(panel,"second-hand");
             act.invoke(panel,"double"); save(panel,"dealer");
             panel.advance(.5f); save(panel,"result");
+            act.invoke(panel,"bet:20"); BlackjackChecks.rig(game,6,13,8,8,2,3);
+            act.invoke(panel,"deal");act.invoke(panel,"hit");act.invoke(panel,"hit");act.invoke(panel,"stand");
+            panel.advance(.5f);save(panel,"readable-hand");
             act.invoke(panel,"bet:20"); BlackjackChecks.rig(game,8,10,8,6,3,2);
             act.invoke(panel,"deal"); act.invoke(panel,"split");
             // Layout stress only: two twenty-card hands, without changing gameplay rules.
@@ -182,7 +198,8 @@ public final class PachinkoPreview {
             case "setAlphaMult" -> { alpha[0]=(Float)a[0];yield null; }
             case "renderAtCenter" -> {
                 if(texture[0]==0) {
-                    BufferedImage art=ImageIO.read(new File("D:/Games/StarSector/starsector-core/graphics/icons/cargo/"+actual));
+                    BufferedImage art=ImageIO.read(new File(path.startsWith(gamblingden.blackjack.CardArt.ROOT)?path:
+                            "D:/Games/StarSector/starsector-core/graphics/icons/cargo/"+actual));
                     ByteBuffer pixels=BufferUtils.createByteBuffer(art.getWidth()*art.getHeight()*4);
                     for(int y=art.getHeight()-1;y>=0;y--) for(int x=0;x<art.getWidth();x++) {
                         int rgba=art.getRGB(x,y);pixels.put((byte)(rgba>>16)).put((byte)(rgba>>8)).put((byte)rgba).put((byte)(rgba>>24));

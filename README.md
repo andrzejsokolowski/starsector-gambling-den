@@ -110,6 +110,11 @@ Play blackjack opens a separate card table in the den. Choose an even bet from 2
 then press Deal. Hit, Stand, Double, Split, and Leave each have a mouse button.
 Bet buttons and the -2, +2, and x2 controls work between rounds.
 
+Cards use the same SVG-cards deck and full-image drawing approach as Interastral Peace Casino.
+The bundled images use the higher-resolution 2x exports. Printed ranks, suit symbols, and face
+art stay together at their original proportions. No interface-font labels cover the cards.
+The dealer uses the red card back until the hand reveals. Interastral does not need to be installed.
+
 The table uses six shuffled decks and reshuffles between rounds when fewer than 52 cards remain.
 The dealer stands on soft 17, a hand with an ace counted as 11. An opening blackjack pays 3:2
 profit, an ordinary win pays 1:1, and a push returns the bet. Even bets keep these payouts exact
@@ -185,6 +190,16 @@ with both icon sizes into `GamblingDen.zip`.
 If `fr.jar` is installed in `starsector-core`, the checks also send 2,400 panel frames through
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
+
+## Changes in 1.3.1
+
+Blackjack replaces the custom card lettering and suit drawings with the full-card sprites used by Interastral.
+The deck uses higher-resolution exports from SVG-cards, with the original source, author list, and LGPL-2.1 license included.
+Cards keep their aspect ratio. Long hands overlap two rows below the rank corners instead of squashing the artwork.
+All card images load before play. Missing artwork disables Deal and shows a reinstall message.
+
+This changes the card display only. Blackjack rules, token payouts, and all other games remain unchanged.
+Tests cover every card face, dealer concealment, crowded split hands, image loading, and Fast Rendering.
 
 ## Changes in 1.3.0
 
@@ -303,5 +318,7 @@ removed when loading earlier saves; no new bar events are created.
 The cabinet owes its shape to the Tachy-Impact machine in **Interastral Peace Casino** by Emanon6
 and WolframSegler, which is shared for free non-commercial use. Blackjack adapts its rules model
 with token accounting and corrections for split hands and dealer blackjacks.
-`THIRD_PARTY_NOTICES.txt` preserves the applicable notice. No Interastral card art, music, or logos
-are included. Pachinko, the blackjack interface, and its card drawings are original implementations.
+`THIRD_PARTY_NOTICES.txt` preserves the applicable notices.
+Blackjack now uses the same SVG-cards deck by David Bellot, Huub de Beer, and contributors.
+Its LGPL-2.1 license and original source ship in `licenses/svg-cards/`.
+No casino music, logos, or table artwork is included. Pachinko and the blackjack table layout are original implementations.

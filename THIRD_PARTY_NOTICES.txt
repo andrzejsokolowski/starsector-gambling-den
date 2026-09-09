@@ -12,5 +12,25 @@ This permission applies to the adapted code. Changes include token accounting,
 bet validation, dealer-blackjack precedence, corrected split-hand settlement,
 split-ace rules, exact integer payouts, incremental dealer play, and safe exits.
 
-The Gambling Den blackjack interface and card drawings are new code. No
-Interastral card artwork, music, logos, or other assets are redistributed.
+The full-card sprite drawing in CardArt.java follows Interastral's
+CardSprites.java and CardRenderingUtils.java. It adds private asset paths,
+preloading, alpha handling, and a missing-art guard. Its adapted code uses
+the same non-commercial permission above.
+
+SVG-cards artwork
+Original creator: David Bellot
+Fork and improvements: Huub de Beer (htdebeer) and contributors
+Project: https://github.com/htdebeer/SVG-cards
+Upstream revision: 6d88bf9c594997b82bc5668ab0877a4e9b717665
+License: GNU Lesser General Public License, version 2.1
+
+graphics/gamblingden/cards/ contains 52 unmodified faces and the red back
+from the upstream png/2x exports of the deck used by Interastral Peace Casino.
+These artwork files retain their LGPL terms, independently of the code's
+non-commercial terms above. No additional restrictions apply to the artwork.
+
+licenses/svg-cards/ includes the original LICENSE, AUTHORS, README.md,
+svg-cards.svg, and editable svg-cards-indented.svg. The upstream README
+documents rendering and links its PNG export tools. The PNGs and source
+are unchanged. You can replace the loose card images without rebuilding
+the mod. No casino music, logos, or table artwork is included.
