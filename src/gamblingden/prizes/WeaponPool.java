@@ -41,15 +41,19 @@ public class WeaponPool {
 
     /** Rolls one weapon, favouring the ordinary over the exotic the way salvage does. */
     public static WeaponSpecAPI pick(Random random) {
+        return picker(random).pick();
+    }
+
+    /** Build once so a bulk award does not recreate and fill a picker for each item. */
+    public static WeightedRandomPicker<WeaponSpecAPI> picker(Random random) {
         List<WeaponSpecAPI> pool = getDroppable();
-        if (pool.isEmpty()) return null;
 
         WeightedRandomPicker<WeaponSpecAPI> picker = new WeightedRandomPicker<WeaponSpecAPI>(random);
         for (WeaponSpecAPI spec : pool) {
             float weight = spec.getRarity();
             picker.add(spec, weight);
         }
-        return picker.pick();
+        return picker;
     }
 
     public static void clearCache() {

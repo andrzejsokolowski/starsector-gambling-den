@@ -64,20 +64,27 @@ The pocket amounts, from left to right, are:
 
 These are direct quantities. An 8 on the hullmod board gives eight random blueprint chips,
 not eight boxes and not a second roll for a prize. The centre pays nothing; the outer pockets
-are the rare large wins. Rewards enter cargo or the token balance when the ball lands.
+are the rare large wins. Each landing adds its reward to the pending winnings total.
+The game generates items and transfers all winnings when you leave the Pachinko screen.
+Pending winnings remain across batches and category changes. Token wins and refunds also wait
+until you leave, so they cannot pay for more balls during the same visit.
 
 Each visible ball's actual landing pocket decides its reward. Ball-to-ball collisions can
 change its path and result. All balls share one fixed-step simulation, so frame rate does not
-change the result for the same launches. **Finish all** advances that same shared simulation.
-Leave, Escape, or an external dialog closure also finish and settle every purchased ball,
-including the queued ones, exactly once. An exceptional stuck ball refunds its price.
-The result line totals the actual rewards and refunds for the run.
+change the result for the same launches. Finish all advances that same shared simulation without collecting rewards.
+Leave & collect, Escape, and an external dialog closure finish every purchased ball and collect the winnings once.
+This includes queued balls. An exceptional stuck ball refunds its price.
+The result line totals the pending rewards and refunds for the run.
+The To collect line shows the combined winnings for the whole visit.
 
 Before a hullmod run, pocket amounts are capped to the number of eligible blueprints left.
-During a run, the displayed board stays fixed and balls share the remaining stock. A ball
+During a run, the displayed board stays fixed and balls share the remaining stock.
+Pending blueprint wins reserve stock, so later balls cannot claim it again. A ball
 whose prize cannot be filled is refunded in full; once stock is empty, remaining balls refund
 their cost even if they land in zero. This is stated before buying. There are no duplicate
 blueprints or credit substitutions. An exhausted category cannot accept new bets.
+At collection, the game checks current stock again. If another mod removed needed stock,
+the game refunds each affected winning ball instead of giving a partial prize.
 
 Live setting edits apply after the board clears, including for extra balls bought during a
 run: they use the same price and pocket amounts still shown on the board. If settings or
@@ -123,6 +130,18 @@ If `fr.jar` is installed in `starsector-core`, the checks also send 1,200 panel 
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
 
+## Changes in 1.1.2
+
+Pachinko holds winnings until you leave the screen. Landings no longer scan item pools, generate
+items, or change cargo. The To collect line shows all pending winnings across batches and categories.
+Finish all finishes the balls without collecting. Leave & collect awards the combined haul once,
+including token wins and refunds. Weapon rewards of the same type enter cargo together.
+
+Tests cover mixed rewards, 20,000 pending weapons, stock reservations, refunds, category changes,
+and collection through every exit. They also reject item generation and cargo access during play.
+The Fast Rendering compatibility tests pass. The landing-lag fix still needs an in-game test.
+Slots rules, ball prices, pocket amounts, and ball physics are unchanged.
+
 ## Changes in 1.1.1
 
 Adds continuous multi-ball Pachinko, 1/10/50-ball buttons, a rapid central launcher, and real
@@ -132,8 +151,8 @@ Slots, ball prices and pocket amounts are unchanged.
 
 Checks include 5,000 colliding balls, 50/100-ball frame-rate comparisons, all reward categories,
 scarce stock, live setting edits, 6,000-item batch payouts, real mouse hitboxes, queued-ball
-settlement on every exit, and a 100-ball board through Fast Rendering. Multi-ball play still
-needs an in-game playtest.
+settlement on every exit, and a 100-ball board through Fast Rendering. The user tested multi-ball
+play and reported a pause when balls landed. Version 1.1.2 moves item generation to exit.
 
 ## Changes in 1.1.0
 

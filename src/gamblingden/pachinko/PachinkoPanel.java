@@ -33,6 +33,7 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
     private final List<String> sessionLog = new ArrayList<String>();
     private Category category = Category.HULLMODS;
     private PachinkoRound.Offer offer;
+    private PachinkoWinnings winnings;
     private PachinkoRound round;
     private final List<PachinkoRound> rounds = new ArrayList<PachinkoRound>();
     private PachinkoSwarm swarm = new PachinkoSwarm();
@@ -43,7 +44,7 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
     private CustomPanelAPI panel;
     private DialogCallbacks callbacks;
     private PositionAPI position;
-    private LabelAPI tokens, result, notice;
+    private LabelAPI tokens, result, pendingWinnings, notice;
     private boolean dismissed, wasMouseDown;
 
     private static final class Btn {
@@ -61,6 +62,7 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
 
     public void init(CustomPanelAPI panel, DialogCallbacks callbacks) {
         this.panel = panel; this.callbacks = callbacks;
+        winnings = new PachinkoWinnings();
         wasMouseDown = Mouse.isCreated() && Mouse.isButtonDown(0);
         label("PACHINKO", GOLD, 0, 18, PANEL_W, 25, Fonts.ORBITRON_20AA);
         tokens = label("", Color.WHITE, 0, 48, PANEL_W, 18, Fonts.DEFAULT_SMALL);
@@ -72,15 +74,16 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
             pocketLabels.add(label("", Color.WHITE, BOARD_X + i * PachinkoBoard.POCKET_WIDTH,
                     BOARD_Y + PachinkoBoard.POCKET_TOP + 3, PachinkoBoard.POCKET_WIDTH, 23, Fonts.ORBITRON_20AA));
         }
-        result = label("", Color.WHITE, 24, 546, PANEL_W - 48, 22, Fonts.DEFAULT_SMALL);
-        notice = label("", DIM, 24, 573, PANEL_W - 48, 18, Fonts.DEFAULT_SMALL);
+        result = label("", Color.WHITE, 24, 544, PANEL_W - 48, 18, Fonts.DEFAULT_SMALL);
+        pendingWinnings = label("", GOLD, 24, 565, PANEL_W - 48, 18, Fonts.DEFAULT_SMALL);
+        notice = label("", DIM, 24, 586, PANEL_W - 48, 18, Fonts.DEFAULT_SMALL);
         button("drop", "", 62, 608, 170, 36);
         button("drop10", "", 244, 608, 190, 36);
         button("drop50", "", 446, 608, 200, 36);
         button("skip", "Finish all", 658, 608, 144, 36);
-        button("leave", "Leave", 814, 608, 124, 36);
-        offer = PachinkoRound.offer(category);
-        stockAvailable = PachinkoRound.stockAvailable(category);
+        button("leave", "Leave & collect", 814, 608, 124, 36);
+        offer = PachinkoRound.offer(category, winnings);
+        stockAvailable = winnings.stockAvailable(category);
         refresh();
     }
 
@@ -103,6 +106,7 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
         int pending = swarm.pending();
         tokens.setText(TokenBank.getTokens() + " tokens" + (running()
                 ? "  |  " + (pending - swarm.queued()) + " falling  |  " + swarm.queued() + " queued" : ""));
+        pendingWinnings.setText(winnings.describe());
         notice.setText(!stockAvailable ? (running() ? "Reward stock exhausted; remaining paid balls will be refunded."
                 : category == Category.HULLMODS ? "No unowned hullmod blueprints left." : "No eligible weapons available.")
                 : category == Category.HULLMODS && stockAvailable
@@ -142,10 +146,10 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
             int count = batchSize(action);
             if (swarm.pending() + count > PachinkoSwarm.MAX_PENDING) return;
             boolean live = running();
-            List<PachinkoRound> bought = PachinkoRound.buyBatch(offer, count, random, live);
+            List<PachinkoRound> bought = PachinkoRound.buyBatch(offer, count, random, live, winnings);
             if (bought.isEmpty() && !live) {
                 // A live slider edit or exhausted pool requires a fresh visible quote.
-                clearRun(); offer = PachinkoRound.offer(category);
+                clearRun(); offer = PachinkoRound.offer(category, winnings);
                 result.setText(offer.canBuy() ? "Pocket amounts or ball price updated." : "");
             } else if (!bought.isEmpty()) {
                 if (!live) clearRun();
@@ -153,14 +157,14 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
                 purchased += bought.size();
                 Global.getSoundPlayer().playUISound("ui_chip_pickup", 1, 1);
             }
-            stockAvailable = PachinkoRound.stockAvailable(category);
+            stockAvailable = winnings.stockAvailable(category);
             refresh();
         } else if (action.startsWith("category:") && !running()) {
             for (Category choice : Category.values()) {
                 if (!action.equals("category:" + choice.name()) || choice == category) continue;
                 category = choice; clearRun();
-                stockAvailable = PachinkoRound.stockAvailable(category);
-                offer = PachinkoRound.offer(category); result.setText(""); refresh();
+                stockAvailable = winnings.stockAvailable(category);
+                offer = PachinkoRound.offer(category, winnings); result.setText(""); refresh();
                 break;
             }
         }
@@ -174,7 +178,6 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
             it.remove(); changed = true; completed++;
             awarded += ball.getAwarded(); refunded += ball.getRefunded();
             won |= ball.getAwarded() > 0;
-            sessionLog.addAll(ball.getLog());
             lastLanded = ball.board;
             if (ball.board.getPocket() >= 0) pocketGlow[ball.board.getPocket()] = 1;
         }
@@ -183,7 +186,7 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
             if (purchased == 1) result.setText(round.getResult());
             result.setColor(awarded > 0 ? category.color : DIM);
             Global.getSoundPlayer().playUISound(won ? "ui_acquired_hullmod" : "ui_button_disabled_pressed", 1, .4f);
-            stockAvailable = PachinkoRound.stockAvailable(category);
+            stockAvailable = winnings.stockAvailable(category);
         }
         refresh();
     }
@@ -210,6 +213,7 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
         if (dismissed) return;
         if (running()) finishAll();
         dismissed = true;
+        sessionLog.addAll(winnings.collect(random).getLines());
     }
 
     public List<String> getSessionLog() { return new ArrayList<String>(sessionLog); }

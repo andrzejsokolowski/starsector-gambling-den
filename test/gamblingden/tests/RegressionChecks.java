@@ -48,6 +48,12 @@ public class RegressionChecks {
     private record DrawnIcon(String path, float x, float y, float alpha) { }
     private static final List<DrawnIcon> drawnIcons = new ArrayList<>();
     private static boolean recordIcons;
+    private static boolean forbidRewards;
+    private static int hullScans, cargoScans, weaponRollSetup, weaponWrites;
+
+    private static void rewardWork() {
+        if (forbidRewards) throw new AssertionError("Reward generation/cargo access while Pachinko is open");
+    }
 
     interface Handler { Object call(Method method, Object[] args) throws Throwable; }
     @SuppressWarnings("unchecked")
@@ -105,6 +111,7 @@ public class RegressionChecks {
         saved.clear(); chips.clear(); known.clear(); hullmods.clear(); weapons.clear(); fleet.clear();
         guns.clear(); wings.clear(); text.clear(); options.clear(); credits=0; dismissals=0;
         drawnIcons.clear(); labelCaptions.clear(); recordIcons=false;
+        forbidRewards=false; hullScans=cargoScans=weaponRollSetup=weaponWrites=0;
         WeaponPool.clearCache();
     }
     private static void setup() {
@@ -118,6 +125,7 @@ public class RegressionChecks {
         cargo = proxy(CargoAPI.class,(m,a) -> switch(m.getName()) {
             case "getCredits" -> account;
             case "getStacksCopy" -> {
+                rewardWork(); cargoScans++;
                 List<CargoStackAPI> stacks = new ArrayList<>();
                 for(String id:chips) stacks.add(proxy(CargoStackAPI.class,(sm,sa)->switch(sm.getName()) {
                     case "getSpecialDataIfSpecial" -> new SpecialItemData(Ids.MODSPEC,id);
@@ -126,8 +134,8 @@ public class RegressionChecks {
                 }));
                 yield stacks;
             }
-            case "addSpecial" -> { check(chips.add(((SpecialItemData)a[0]).getData()),"Duplicate blueprint awarded"); yield null; }
-            case "addWeapons" -> { guns.merge((String)a[0],(Integer)a[1],Integer::sum); yield null; }
+            case "addSpecial" -> { rewardWork(); check(chips.add(((SpecialItemData)a[0]).getData()),"Duplicate blueprint awarded"); yield null; }
+            case "addWeapons" -> { rewardWork(); weaponWrites++; guns.merge((String)a[0],(Integer)a[1],Integer::sum); yield null; }
             case "addFighters" -> { wings.merge((String)a[0],(Integer)a[1],Integer::sum); yield null; }
             case "removeItems" -> { chips.remove(((SpecialItemData)a[1]).getData()); yield null; }
             default -> null;
@@ -156,8 +164,8 @@ public class RegressionChecks {
             default -> null;
         }));
         Global.setSettings(proxy(SettingsAPI.class,(m,a)->switch(m.getName()) {
-            case "getAllHullModSpecs" -> new ArrayList<>(hullmods);
-            case "getAllWeaponSpecs" -> new ArrayList<>(weapons);
+            case "getAllHullModSpecs" -> { rewardWork(); hullScans++; yield new ArrayList<>(hullmods); }
+            case "getAllWeaponSpecs" -> { rewardWork(); yield new ArrayList<>(weapons); }
             case "getAllBarEventSpecs" -> new ArrayList<>();
             case "getHullModSpec" -> hullmods.stream().filter(s->s.getId().equals(a[0])).findFirst().orElse(null);
             case "getScreenScaleMult" -> 1f;
@@ -170,7 +178,7 @@ public class RegressionChecks {
     private static HullModSpecAPI hullmod(String id, float rarity, String... tags) {
         return proxy(HullModSpecAPI.class,(m,a)->switch(m.getName()) {
             case "getId", "getDisplayName" -> id;
-            case "getRarity" -> rarity;
+            case "getRarity" -> { rewardWork(); yield rarity; }
             case "hasTag" -> Arrays.asList(tags).contains(a[0]);
             case "getBaseValue" -> 2000f;
             default -> null;
@@ -179,7 +187,7 @@ public class RegressionChecks {
     private static WeaponSpecAPI weapon(String id, float rarity, boolean system, String... tags) {
         return proxy(WeaponSpecAPI.class,(m,a)->switch(m.getName()) {
             case "getWeaponId", "getWeaponName" -> id;
-            case "getRarity" -> rarity;
+            case "getRarity" -> { rewardWork(); weaponRollSetup++; yield rarity; }
             case "getType" -> WeaponType.ENERGY;
             case "getAIHints" -> system ? EnumSet.of(AIHints.SYSTEM) : EnumSet.noneOf(AIHints.class);
             case "hasTag" -> Arrays.asList(tags).contains(a[0]);
@@ -509,6 +517,10 @@ public class RegressionChecks {
                     round.advance(1f/60); round.finish(); round.finish(); round.advance(20);
                     int pocket = round.board.getPocket(); seen[pocket] = true;
                     int amount = offer.amount(pocket);
+                    check(chips.isEmpty() && guns.isEmpty() && TokenBank.getTokens()==1000-offer.cost,
+                            "Landing wrote rewards before collection");
+                    var receipt = round.getWinnings().collect(new Random(seed));
+                    check(round.getWinnings().collect(new Random(seed+1))==receipt,"Collection did not return the same receipt");
                     check(chips.size() == (category.name().equals("HULLMODS") ? amount : 0), "Pachinko hullmod mismatch/crate multiplication");
                     check(guns.getOrDefault("test_gun",0) == (category.name().equals("WEAPONS") ? amount : 0), "Pachinko weapon mismatch/crate multiplication");
                     check(TokenBank.getTokens()==1000-offer.cost+(category.name().equals("TOKENS")?amount:0), "Pachinko token mismatch");
@@ -613,6 +625,8 @@ public class RegressionChecks {
             for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,1);
             settings.put("gd_pachinko_cost_weapons",100);
             round.finish(); round.finish();
+            check(guns.isEmpty() && round.getWinnings().weapons()==100,"Settings changed held reward or paid it early");
+            round.getWinnings().collect(new Random(12));
             check(guns.get("custom_gun")==100 && TokenBank.getTokens()==1993,"In-flight settings changed paid ball");
             check(gamblingden.pachinko.PachinkoRound.buy(offer,new Random(12))==null && TokenBank.getTokens()==1993,"Changed settings silently charged stale quote");
             settings.put("gd_pachinko_cost_weapons",-5);
@@ -625,6 +639,7 @@ public class RegressionChecks {
             var capped=gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.TOKENS);
             check(capped.maximum()<=capped.cost && !capped.notice.isEmpty(),"Token cap not advertised");
             var limit=gamblingden.pachinko.PachinkoRound.buy(capped,new Random(4)); limit.finish();
+            limit.getWinnings().collect(new Random(4));
             check(TokenBank.getTokens()==Integer.MAX_VALUE-capped.cost+capped.amount(limit.board.getPocket()),"Token cap mismatch");
 
             reset(); TokenBank.addTokens(100); hullmods.add(hullmod("disappears",1));
@@ -632,7 +647,11 @@ public class RegressionChecks {
             var disappearing=gamblingden.pachinko.PachinkoRound.buy(
                     gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS),new Random(7));
             known.add("disappears"); disappearing.finish(); disappearing.finish();
-            check(TokenBank.getTokens()==100 && chips.isEmpty() && credits==0 && disappearing.getResult().contains("refunded"),"Unavailable target was not refunded exactly once");
+            check(TokenBank.getTokens()==100-disappearing.offer.cost,"External stock change paid an early refund");
+            var missingReceipt=disappearing.getWinnings().collect(new Random(7));
+            disappearing.getWinnings().collect(new Random(7));
+            check(TokenBank.getTokens()==100 && chips.isEmpty() && credits==0 && missingReceipt.getRefunds()==disappearing.offer.cost,
+                    "Unavailable target was not refunded exactly once on exit");
 
             reset(); TokenBank.addTokens(10000); weapons.add(weapon("bulk",1,false));
             for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,100);
@@ -645,14 +664,113 @@ public class RegressionChecks {
             invoke(liveBoard,"act",String.class,"drop50");
             check(TokenBank.getTokens()==9580,"Live board did not preserve displayed price for additional balls");
             invoke(liveBoard,"act",String.class,"skip");
-            check(guns.get("bulk")==6000 && TokenBank.getTokens()==9580,"Multi-ball 100-item setting lost or multiplied rewards");
+            var held=(gamblingden.pachinko.PachinkoWinnings)get(liveBoard,"winnings");
+            check(guns.isEmpty() && held.weapons()==6000 && TokenBank.getTokens()==9580,"Multi-ball 100-item setting lost or multiplied pending rewards");
             invoke(liveBoard,"act",String.class,"drop");
             check(TokenBank.getTokens()==9580 && ((List<?>)get(liveBoard,"rounds")).isEmpty(),"Next run silently accepted changed settings");
             invoke(liveBoard,"act",String.class,"drop"); invoke(liveBoard,"act",String.class,"skip");
-            check(TokenBank.getTokens()==8580 && guns.get("bulk")==6001,"Next run did not use fresh settings");
+            check(TokenBank.getTokens()==8580 && guns.isEmpty() && held.weapons()==6001,"Next run lost held rewards or did not use fresh settings");
+            liveBoard.finishOnDismissal(); liveBoard.finishOnDismissal();
+            check(guns.get("bulk")==6001,"Changed settings altered already-won rewards on collection");
+            pachinkoDeferred(settings);
         } finally {
             lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous); loader.setHasLoaded(loaded);
         }
+    }
+
+    private static void pachinkoDeferred(org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject settings) throws Exception {
+        reset(); TokenBank.addTokens(100000);
+        for(int i=0;i<3;i++) hullmods.add(hullmod("held_"+i,1));
+        weapons.add(weapon("pooled_gun",1,false));
+        settings.put("gd_pachinko_cost_hullmods",4);
+        settings.put("gd_pachinko_cost_weapons",7);
+        settings.put("gd_pachinko_cost_tokens",2);
+        for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,2);
+        var panel=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+        var held=(gamblingden.pachinko.PachinkoWinnings)get(panel,"winnings");
+        try {
+            // Any inventory access, candidate scan, or item-picker setup now fails immediately.
+            forbidRewards=true;
+            invoke(panel,"act",String.class,"drop50");
+            for(int frame=0;frame<600 && !((List<?>)get(panel,"rounds")).isEmpty();frame++) panel.advance(1f/60);
+            invoke(panel,"act",String.class,"skip");
+            check(held.blueprints()==2 && held.hullmodsLeft()==1 && held.refunds()==196,"Deferred scarcity reservations/refunds wrong");
+            check(TokenBank.getTokens()==99800,"Stock refunds were spendable before leaving");
+            invoke(panel,"act",String.class,"drop"); // Refresh capped pockets from two to one, without charging.
+            check(TokenBank.getTokens()==99800 && ((List<?>)get(panel,"rounds")).isEmpty(),"New run charged a stale stock quote");
+            invoke(panel,"act",String.class,"drop"); invoke(panel,"act",String.class,"skip");
+            check(held.blueprints()==3 && held.hullmodsLeft()==0,"New run reused reserved hullmods");
+            invoke(panel,"act",String.class,"drop");
+            check(TokenBank.getTokens()==99796,"Exhausted reserved stock accepted another bet");
+
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,100);
+            invoke(panel,"act",String.class,"category:WEAPONS");
+            for(int run=0;run<2;run++) {
+                invoke(panel,"act",String.class,"drop50"); invoke(panel,"act",String.class,"drop50");
+                invoke(panel,"act",String.class,"skip");
+            }
+            check(held.weapons()==20000 && held.blueprints()==3,"New runs/categories lost or capped pooled winnings");
+            invoke(panel,"act",String.class,"category:TOKENS");
+            invoke(panel,"act",String.class,"drop50"); invoke(panel,"act",String.class,"skip");
+            check(held.tokens()==5000 && TokenBank.getTokens()==98296,"Token winnings paid before exit");
+            check(chips.isEmpty() && guns.isEmpty() && panel.getSessionLog().isEmpty(),"Open screen generated or logged item rewards");
+            String display=((LabelAPI)get(panel,"pendingWinnings")).getText();
+            check(display.contains("3 blueprints") && display.contains("20000 weapons") && display.contains("5196 tokens"),
+                    "Pending label lost winnings after category changes");
+            check(held.refunds()==196 && held.tokenRoom()==(long)Integer.MAX_VALUE-98296-5196,"Pending token/refund cap accounting wrong");
+        } finally { forbidRewards=false; }
+
+        hullScans=cargoScans=weaponRollSetup=weaponWrites=0;
+        invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{870f,623f,false});
+        invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{870f,623f,true});
+        panel.finishOnDismissal();
+        new gamblingden.pachinko.PachinkoDialogDelegate(panel,()->{}).reportDismissed(0);
+        check(chips.size()==3 && guns.get("pooled_gun")==20000 && TokenBank.getTokens()==103492 && credits==0,
+                "Leave & collect lost/capped/doubled mixed-category winnings");
+        check(hullScans==1 && cargoScans==1 && weaponRollSetup==1 && weaponWrites==1,
+                "Collection did not scan once and add matching weapons in bulk");
+        check(panel.getSessionLog().size()==3 && held.isCollected(),"Collection receipt did not describe the entire visit");
+        var receipt=held.collect(new Random(9));
+        check(receipt.getBlueprints()==3 && receipt.getWeapons()==20000 && receipt.getTokens()==5196 && receipt.getRefunds()==196,
+                "Collection receipt differs from cargo/balance");
+        invoke(panel,"act",String.class,"drop50");
+        check(TokenBank.getTokens()==103492 && guns.get("pooled_gun")==20000,"Closed panel accepted a purchase");
+        var nextVisit=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+        check(((gamblingden.pachinko.PachinkoWinnings)get(nextVisit,"winnings")).describe().isEmpty(),"New visit inherited old winnings");
+        nextVisit.finishOnDismissal();
+        check(TokenBank.getTokens()==103492 && guns.get("pooled_gun")==20000,"Empty visit paid old winnings again");
+
+        reset(); TokenBank.addTokens(2);
+        var broke=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+        invoke(broke,"act",String.class,"category:TOKENS");
+        invoke(broke,"act",String.class,"drop"); invoke(broke,"act",String.class,"skip");
+        check(TokenBank.getTokens()==0 && ((gamblingden.pachinko.PachinkoWinnings)get(broke,"winnings")).tokens()==100,
+                "Token reward was not held until leaving");
+        invoke(broke,"act",String.class,"drop");
+        check(((List<?>)get(broke,"rounds")).isEmpty() && TokenBank.getTokens()==0,"Pending tokens funded an unpaid ball");
+        broke.finishOnDismissal();
+        check(TokenBank.getTokens()==100,"Leaving did not release pending tokens");
+
+        // External stock changes are reconciled only at collection, never during a fall.
+        reset(); TokenBank.addTokens(100);
+        for(int i=0;i<4;i++) hullmods.add(hullmod("changed_"+i,1));
+        for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,2);
+        var batch=gamblingden.pachinko.PachinkoRound.buyBatch(gamblingden.pachinko.PachinkoRound.offer(
+                gamblingden.pachinko.PachinkoSettings.Category.HULLMODS),2,new Random(4),false);
+        for(var ball:batch) ball.finish();
+        known.add("changed_0");
+        check(chips.isEmpty() && TokenBank.getTokens()==92,"Held hullmod lot paid early");
+        var adjusted=batch.get(0).getWinnings().collect(new Random(4));
+        check(adjusted.getBlueprints()==2 && adjusted.getRefunds()==4 && chips.size()==2 && !chips.contains("changed_0")
+                && TokenBank.getTokens()==96 && credits==0,"Exit stock recheck partially substituted a hullmod lot");
+
+        reset(); TokenBank.addTokens(100); weapons.add(weapon("removed_gun",1,false));
+        var removed=gamblingden.pachinko.PachinkoRound.buy(gamblingden.pachinko.PachinkoRound.offer(
+                gamblingden.pachinko.PachinkoSettings.Category.WEAPONS),new Random(4));
+        removed.finish(); weapons.clear(); WeaponPool.clearCache();
+        var refunded=removed.getWinnings().collect(new Random(4));
+        check(refunded.getWeapons()==0 && refunded.getRefunds()==7 && guns.isEmpty() && TokenBank.getTokens()==100 && credits==0,
+                "Missing weapon pool was not refunded on exit");
     }
 
     @SuppressWarnings("unchecked")
@@ -678,13 +796,14 @@ public class RegressionChecks {
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{725f,623f,false});
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{725f,623f,true});
         int winnings=all.stream().mapToInt(gamblingden.pachinko.PachinkoRound::getAwarded).sum();
-        check(TokenBank.getTokens()==1878+winnings && all.stream().allMatch(gamblingden.pachinko.PachinkoRound::isSettled),"Finish all lost batch payout");
+        check(TokenBank.getTokens()==1878 && ((gamblingden.pachinko.PachinkoWinnings)get(panel,"winnings")).tokens()==winnings
+                && all.stream().allMatch(gamblingden.pachinko.PachinkoRound::isSettled),"Finish all lost/paid pending batch winnings");
         check(live.isEmpty() && swarm.balls().isEmpty(),"Completed physics bodies retained during continuous play");
         check(((LabelAPI)get(panel,"result")).getText().contains(winnings+" tokens")
                 && ((LabelAPI)get(panel,"result")).getText().contains("61/61"),"Batch total not displayed accurately");
         check(swarm.getCollisions()>0,"UI does not use ball-to-ball collisions");
         int after=TokenBank.getTokens(); panel.finishOnDismissal(); panel.finishOnDismissal();
-        check(TokenBank.getTokens()==after,"Batch double-paid on close");
+        check(TokenBank.getTokens()==after+winnings,"Batch lost/double-paid on close");
 
         // Every exit settles every purchased ball, including balls still inside the launcher.
         for(String exit:List.of("escape","leave","external")) {
@@ -722,6 +841,9 @@ public class RegressionChecks {
                 check(balls.size()==50 && balls.stream().allMatch(gamblingden.pachinko.PachinkoRound::isSettled),"Not all category balls settled");
                 int units=balls.stream().mapToInt(gamblingden.pachinko.PachinkoRound::getAwarded).sum();
                 int refunds=balls.stream().mapToInt(gamblingden.pachinko.PachinkoRound::getRefunded).sum();
+                check(chips.isEmpty() && guns.isEmpty() && TokenBank.getTokens()==5000-50*balls.get(0).offer.cost,
+                        "Shared board paid winnings/refunds before exit");
+                game.finishOnDismissal();
                 check(TokenBank.getTokens()==5000-50*balls.get(0).offer.cost+refunds+(category.name().equals("TOKENS")?units:0),"Shared-category accounting mismatch");
                 check(chips.size()==(category.name().equals("HULLMODS")?units:0) && guns.getOrDefault("batch_gun",0)==(category.name().equals("WEAPONS")?units:0)
                         && credits==0,"Wrong cargo from shared board");

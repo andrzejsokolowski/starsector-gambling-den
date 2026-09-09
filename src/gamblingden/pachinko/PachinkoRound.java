@@ -3,11 +3,7 @@ package gamblingden.pachinko;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import gamblingden.economy.BlueprintPool;
 import gamblingden.economy.TokenBank;
-import gamblingden.prizes.Payout;
-import gamblingden.prizes.Prize;
-import gamblingden.prizes.WeaponPool;
 import gamblingden.pachinko.PachinkoSettings.Category;
 
 /** One paid ball. The category, cost and visible pocket amounts are fixed at purchase. */
@@ -31,28 +27,31 @@ public final class PachinkoRound {
 
     public final Offer offer;
     public final PachinkoBoard board;
-    private final Random rewards;
+    private final PachinkoWinnings winnings;
     private boolean settled;
     private int awarded, refunded;
     private String result = "";
-    private final List<String> log = new ArrayList<String>();
 
     public static Offer offer(Category category) {
+        return offer(category, new PachinkoWinnings());
+    }
+
+    public static Offer offer(Category category, PachinkoWinnings winnings) {
         int[] amounts = PachinkoSettings.amounts();
         String notice = "";
         if (category == Category.HULLMODS) {
-            int available = BlueprintPool.getEligible().size();
+            int available = winnings.hullmodsLeft();
             boolean capped = false;
             for (int i = 0; i < amounts.length; i++) {
                 if (amounts[i] > available) { capped = true; amounts[i] = available; }
             }
             if (capped) notice = available == 0 ? "No unowned hullmod blueprints left."
                     : "Only " + available + " unowned blueprints left; pocket amounts capped at " + available + ".";
-        } else if (category == Category.WEAPONS && WeaponPool.isEmpty()) {
+        } else if (category == Category.WEAPONS && !winnings.stockAvailable(category)) {
             java.util.Arrays.fill(amounts, 0);
             notice = "No eligible weapons available.";
         } else if (category == Category.TOKENS) {
-            long room = (long) Integer.MAX_VALUE - TokenBank.getTokens() + PachinkoSettings.cost(category);
+            long room = winnings.tokenRoom() + PachinkoSettings.cost(category);
             for (int i = 0; i < amounts.length; i++) {
                 if (amounts[i] > room) { amounts[i] = (int) room; notice = "Pocket amounts capped by the token balance limit."; }
             }
@@ -69,37 +68,39 @@ public final class PachinkoRound {
         return batch.isEmpty() ? null : batch.get(0);
     }
 
-    public static boolean stockAvailable(Category category) {
-        return category == Category.TOKENS || (category == Category.HULLMODS
-                ? !BlueprintPool.getEligible().isEmpty() : !WeaponPool.isEmpty());
-    }
-
     /** One atomic charge: a batch is purchased in full or not at all. During a live run the
      * displayed board stays fixed; edited settings apply after the board is cleared. */
     public static List<PachinkoRound> buyBatch(Offer shown, int count, Random random, boolean liveBoard) {
+        return buyBatch(shown, count, random, liveBoard, new PachinkoWinnings());
+    }
+
+    public static List<PachinkoRound> buyBatch(Offer shown, int count, Random random, boolean liveBoard, PachinkoWinnings winnings) {
         List<PachinkoRound> batch = new ArrayList<PachinkoRound>();
         if (count < 1 || count > PachinkoSwarm.MAX_PENDING) return batch;
-        Offer current = offer(shown.category);
+        Offer current = offer(shown.category, winnings);
         if ((!liveBoard && (current.cost != shown.cost || !java.util.Arrays.equals(current.amounts, shown.amounts)))
-                || shown.maximum() == 0 || !stockAvailable(shown.category)) return batch;
+                || shown.maximum() == 0 || !winnings.stockAvailable(shown.category)) return batch;
         long cost = (long) shown.cost * count;
         if (cost > TokenBank.getTokens()) return batch;
-        for (int i = 0; i < count; i++) batch.add(new PachinkoRound(shown, random));
+        for (int i = 0; i < count; i++) batch.add(new PachinkoRound(shown, random, winnings));
         if (!TokenBank.spendTokens((int) cost)) batch.clear();
+        else winnings.purchased((int) cost);
         return batch;
     }
 
-    private PachinkoRound(Offer offer, Random random) {
+    private PachinkoRound(Offer offer, Random random, PachinkoWinnings winnings) {
         this.offer = offer;
         board = new PachinkoBoard(new Random(random.nextLong()));
-        rewards = new Random(random.nextLong());
+        random.nextLong(); // Preserve the previous per-ball physics seed sequence.
+        this.winnings = winnings;
     }
 
     public boolean isSettled() { return settled; }
     public String getResult() { return result; }
+    /** Reserved quantities, not cargo transfers. The visit collects them on exit. */
     public int getAwarded() { return awarded; }
     public int getRefunded() { return refunded; }
-    public List<String> getLog() { return new ArrayList<String>(log); }
+    public PachinkoWinnings getWinnings() { return winnings; }
     public void advance(float seconds) { if (!settled) { board.advance(seconds); settle(); } }
     public void finish() { if (!settled) { board.finish(); settle(); } }
 
@@ -108,30 +109,20 @@ public final class PachinkoRound {
         // Mark first: duplicate UI callbacks must never award/refund a ball twice.
         settled = true;
         if (board.isJammed()) { refund("Ball jammed"); return; }
-        if (!stockAvailable(offer.category)) { refund("Reward stock exhausted"); return; }
+        if (!winnings.stockAvailable(offer.category)) { refund("Reward stock exhausted"); return; }
         int amount = offer.amount(board.getPocket());
         if (amount == 0) { result = "Nothing."; return; }
-        // Another mod can change cargo during a custom dialog. Never silently replace a
-        // targeted item with cash if the promised category has become unavailable.
-        if ((offer.category == Category.HULLMODS && BlueprintPool.getEligible().size() < amount)
-                || (offer.category == Category.WEAPONS && WeaponPool.isEmpty())
-                || (offer.category == Category.TOKENS && Integer.MAX_VALUE - TokenBank.getTokens() < amount)) {
+        if (!winnings.reserve(offer.category, amount, offer.cost)) {
             refund("Reward unavailable"); return;
         }
-        Payout payout = new Payout();
-        Prize prize = offer.category == Category.HULLMODS ? Prize.BOX_SMALL
-                : offer.category == Category.WEAPONS ? Prize.WEAPONS_SMALL : Prize.TOKENS;
-        payout.addUnits(prize, amount);
-        Payout.Receipt receipt = payout.grant(rewards);
-        awarded = receipt.getBlueprints() + receipt.getWeapons() + receipt.getTokens();
-        result = "Won " + receipt.describe() + ".";
-        log.addAll(receipt.getLines());
+        awarded = amount;
+        result = "Won " + amount + (offer.category == Category.HULLMODS ? " hullmod blueprints."
+                : offer.category == Category.WEAPONS ? " weapons." : " tokens.");
     }
 
     private void refund(String reason) {
-        int returned = TokenBank.addTokens(offer.cost);
+        int returned = winnings.refund(offer.cost);
         refunded = returned;
         result = reason + "; " + returned + (returned == 1 ? " token refunded." : " tokens refunded.");
-        log.add(result);
     }
 }
