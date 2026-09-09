@@ -21,7 +21,8 @@ import gamblingden.prizes.Prize;
 public class SlotMachine {
 
     public static int costOf(int reels, int stake) {
-        return reels * Config.STAKE_COST[clampStake(stake)];
+        return (int) Math.min(Integer.MAX_VALUE,
+                (long) clampReels(reels) * Math.max(1, Config.STAKE_COST[clampStake(stake)]));
     }
 
     public static int clampStake(int stake) {

@@ -1,6 +1,7 @@
 package gamblingden.slots;
 
 import java.awt.Color;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Map;
 import java.util.Random;
 
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
@@ -131,6 +133,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     private CustomPanelAPI panel;
     private DialogCallbacks callbacks;
     private PositionAPI p;
+    private final IntBuffer clipRect = BufferUtils.createIntBuffer(16);
 
     private final Random random = new Random();
     private final List<Reel> reels = new ArrayList<Reel>();
@@ -325,13 +328,14 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
         setState(ACT_PULL, ready && tokens >= cost, false);
         setState(ACT_SKIP, spinning, false);
         setState(ACT_TAKE, offering, false);
-        setState(ACT_DOUBLE, offering, false);
-        setState(ACT_LEAVE, !spinning, false);
+        setState(ACT_DOUBLE, offering && held != null && held.canDouble(), false);
+        setState(ACT_LEAVE, true, false);
     }
 
     // -------------------------------------------------------------------- play
 
     private void startSpin() {
+        if (dismissed || state != State.READY) return;
         int cost = SlotMachine.costOf(reelCount, stake);
         if (!TokenBank.spendTokens(cost)) return;
 
@@ -351,6 +355,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     }
 
     private void settle() {
+        if (state != State.SPINNING) return;
         if (pending == null) {
             state = State.READY;
             refresh();
@@ -386,9 +391,9 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
 
     private void takeWinnings() {
         if (held == null) return;
-        String taken = held.describe();
-        sessionLog.addAll(held.grant(random));
-        resultLabel.setText("Into the hold: " + taken + ".");
+        Payout.Receipt receipt = held.grant(random);
+        sessionLog.addAll(receipt.getLines());
+        resultLabel.setText("Collected: " + receipt.describe() + ".");
         resultLabel.setColor(new Color(150, 230, 150));
         held = null;
         state = State.READY;
@@ -397,7 +402,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     }
 
     private void doubleOrNothing() {
-        if (held == null) return;
+        if (dismissed || held == null || !held.canDouble()) return;
 
         if (random.nextFloat() < Config.DOUBLE_OR_NOTHING_WIN_CHANCE) {
             held.doubleUp();
@@ -419,10 +424,19 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
 
     private void leave() {
         if (dismissed) return;
-        // Never let a won payout be walked away from by accident.
+        finishOnDismissal();
+        if (callbacks != null) callbacks.dismissDialog();
+    }
+
+    /** Covers the Leave button, Escape, and a dialog dismissed by the game itself. */
+    public void finishOnDismissal() {
+        if (dismissed) return;
+        if (state == State.SPINNING) {
+            skipAnimation();
+            settle();
+        }
         if (held != null) takeWinnings();
         dismissed = true;
-        if (callbacks != null) callbacks.dismissDialog();
     }
 
     private void setReels(int count) {
@@ -455,6 +469,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     }
 
     private void act(String action) {
+        if (dismissed) return;
         if (ACT_PULL.equals(action)) {
             startSpin();
         } else if (ACT_SKIP.equals(action)) {
@@ -535,7 +550,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     /** Keyboard shortcuts. Every one of these has a button too; none of them is the only way. */
     @Override
     public void processInput(List<InputEventAPI> events) {
-        if (events == null) return;
+        if (events == null || dismissed) return;
         for (InputEventAPI event : events) {
             if (event.isConsumed() || !event.isKeyDownEvent()) continue;
 
@@ -570,6 +585,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     @Override
     public void advance(float amount) {
         pollMouse();
+        if (dismissed) return;
 
         stateTimer += amount;
         lightTimer += amount;
@@ -647,37 +663,41 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     public void renderBelow(float alphaMult) {
         if (p == null) return;
 
-        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_COLOR_BUFFER_BIT | GL11.GL_SCISSOR_BIT
+                | GL11.GL_CURRENT_BIT | GL11.GL_LINE_BIT | GL11.GL_TEXTURE_BIT);
+        try {
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+            GL11.glEnable(GL11.GL_BLEND);
+            GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
-        GLDraw.quad(p.getX(), p.getY(), p.getWidth(), p.getHeight(), BG, alphaMult);
+            GLDraw.quad(p.getX(), p.getY(), p.getWidth(), p.getHeight(), BG, alphaMult);
 
-        float jitter = shake > 0f ? (random.nextFloat() - 0.5f) * 5f * shake : 0f;
+            float jitter = shake > 0f ? (random.nextFloat() - 0.5f) * 5f * shake : 0f;
 
-        float cabW = cabinetWidth();
-        float cabX = glX((PANEL_W - cabW) / 2f) + jitter;
-        float cabY = glY(Y_CABINET, H_CABINET);
+            float cabW = cabinetWidth();
+            float cabX = glX((PANEL_W - cabW) / 2f) + jitter;
+            float cabY = glY(Y_CABINET, H_CABINET);
 
-        drawCabinet(cabX, cabY, cabW, H_CABINET, alphaMult);
-        drawChaseLights(cabX, cabY, cabW, H_CABINET, alphaMult);
+            drawCabinet(cabX, cabY, cabW, H_CABINET, alphaMult);
+            drawChaseLights(cabX, cabY, cabW, H_CABINET, alphaMult);
 
-        float rw = reelWidth();
-        float left = glX(stripLeft()) + jitter;
-        float windowY = glY(Y_WINDOW, WINDOW_H);
+            float rw = reelWidth();
+            float left = glX(stripLeft()) + jitter;
+            float windowY = glY(Y_WINDOW, WINDOW_H);
 
-        for (int i = 0; i < reels.size(); i++) {
-            drawReel(reels.get(i), left + i * (rw + REEL_GAP), windowY, rw, alphaMult);
+            for (int i = 0; i < reels.size(); i++) {
+                drawReel(reels.get(i), left + i * (rw + REEL_GAP), windowY, rw, alphaMult);
+            }
+
+            drawPayLine(left, stripWidth(), windowY, alphaMult);
+
+            for (Btn button : buttons) {
+                drawButton(button, alphaMult);
+            }
+
+        } finally {
+            GL11.glPopAttrib();
         }
-
-        drawPayLine(left, stripWidth(), windowY, alphaMult);
-
-        for (Btn button : buttons) {
-            drawButton(button, alphaMult);
-        }
-
-        GL11.glPopAttrib();
     }
 
     private void drawButton(Btn button, float alphaMult) {
@@ -755,23 +775,23 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
 
         // Clip the strip to the window so symbols slide in and out of view instead of
         // appearing over the cabinet.
-        float scale = Global.getSettings().getScreenScaleMult();
-        GL11.glEnable(GL11.GL_SCISSOR_TEST);
-        GL11.glScissor((int) (x * scale), (int) (y * scale),
-                (int) (w * scale), (int) (WINDOW_H * scale));
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glPushAttrib(GL11.GL_SCISSOR_BIT | GL11.GL_ENABLE_BIT);
+        try {
+            clipWindow(x, y, w, WINDOW_H);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
 
-        float centreX = x + w / 2f;
-        // Strip index 0 is the symbol entering from above; PAY_LINE sits in the middle.
-        float topOfStrip = y + WINDOW_H + SLOT_H;
-        for (int i = 0; i < reel.strip.size(); i++) {
-            float centreY = topOfStrip - (i + 0.5f) * SLOT_H - reel.offset;
-            boolean onPayLine = reel.stopped && i == Reel.PAY_LINE;
-            drawSymbol(reel.strip.get(i), centreX, centreY, alphaMult, onPayLine);
+            float centreX = x + w / 2f;
+            // Strip index 0 is the symbol entering from above; PAY_LINE sits in the middle.
+            float topOfStrip = y + WINDOW_H + SLOT_H;
+            for (int i = 0; i < reel.strip.size(); i++) {
+                float centreY = topOfStrip - (i + 0.5f) * SLOT_H - reel.offset;
+                boolean onPayLine = reel.stopped && i == Reel.PAY_LINE;
+                drawSymbol(reel.strip.get(i), centreX, centreY, alphaMult, onPayLine);
+            }
+
+        } finally {
+            GL11.glPopAttrib();
         }
-
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glDisable(GL11.GL_SCISSOR_TEST);
 
         // Fade the top and bottom of the window so the strip looks like it curves away.
         GLDraw.verticalFade(x, y + WINDOW_H - 26f, w, 26f, new Color(0, 0, 0, 0),
@@ -779,6 +799,22 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
         GLDraw.verticalFade(x, y, w, 26f, WINDOW_BG, new Color(0, 0, 0, 0), alphaMult);
         GLDraw.innerShadow(x, y, w, WINDOW_H, 5f, alphaMult);
         GLDraw.frame(x, y, w, WINDOW_H, GLDraw.darken(TRIM, 0.35f), 2f, alphaMult * 0.8f);
+    }
+
+    private void clipWindow(float x, float y, float w, float h) {
+        float scale = Global.getSettings().getScreenScaleMult();
+        int left = (int) Math.floor(x * scale), bottom = (int) Math.floor(y * scale);
+        int right = (int) Math.ceil((x + w) * scale), top = (int) Math.ceil((y + h) * scale);
+        if (GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)) {
+            clipRect.clear();
+            GL11.glGetInteger(GL11.GL_SCISSOR_BOX, clipRect);
+            left = Math.max(left, clipRect.get(0));
+            bottom = Math.max(bottom, clipRect.get(1));
+            right = Math.min(right, clipRect.get(0) + clipRect.get(2));
+            top = Math.min(top, clipRect.get(1) + clipRect.get(3));
+        }
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+        GL11.glScissor(left, bottom, Math.max(0, right - left), Math.max(0, top - bottom));
     }
 
     private void drawSymbol(Prize symbol, float cx, float cy, float alphaMult, boolean highlight) {

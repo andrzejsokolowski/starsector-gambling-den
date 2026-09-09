@@ -53,6 +53,7 @@ public class BlueprintPool {
             if (Global.getSector().getPlayerFaction().knowsHullMod(spec.getId())) continue;
             if (spec.isHidden() || spec.isHiddenEverywhere()) continue;
             if (spec.hasTag(Tags.HULLMOD_NO_DROP)) continue;
+            if (!Float.isFinite(spec.getRarity()) || spec.getRarity() <= 0f) continue;
             if (held.contains(spec.getId())) continue;
             out.add(spec);
         }
@@ -70,7 +71,6 @@ public class BlueprintPool {
         WeightedRandomPicker<HullModSpecAPI> picker = new WeightedRandomPicker<HullModSpecAPI>(random);
         for (HullModSpecAPI spec : specs) {
             float weight = spec.getRarity();
-            if (weight <= 0f) weight = 1f;
             picker.add(spec, weight);
         }
         return picker.pick();

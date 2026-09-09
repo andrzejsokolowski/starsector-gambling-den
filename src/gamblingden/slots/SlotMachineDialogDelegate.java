@@ -9,6 +9,7 @@ public class SlotMachineDialogDelegate implements CustomVisualDialogDelegate {
 
     private final SlotMachinePanel machine;
     private final Runnable onClose;
+    private boolean reported;
 
     public SlotMachineDialogDelegate(SlotMachinePanel machine, Runnable onClose) {
         this.machine = machine;
@@ -39,6 +40,9 @@ public class SlotMachineDialogDelegate implements CustomVisualDialogDelegate {
 
     @Override
     public void reportDismissed(int option) {
+        if (reported) return;
+        machine.finishOnDismissal();
+        reported = true;
         if (onClose != null) onClose.run();
     }
 }

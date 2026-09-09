@@ -24,22 +24,21 @@
 	# meant to be the ordinary outcome. Overridden by the sliders.
 	"hitChance": [0.16, 0.20, 0.26],
 
-	# When a reel does pay, this is what it pays, as relative weights. Higher stakes buy the
-	# bigger crates, not better luck.
+	# Relative prize weights once a reel wins. Higher stakes also unlock bigger crates.
 	"weightsLow": {
-		"tokens": 34, "credits": 30,
+		"tokens": 34, "credits": 24,
 		"weapons_small": 24, "weapons_medium": 6, "weapons_large": 0,
-		"box_small": 6, "box_medium": 0, "box_large": 0
+		"box_small": 12, "box_medium": 0, "box_large": 0
 	},
 	"weightsMid": {
-		"tokens": 30, "credits": 26,
+		"tokens": 30, "credits": 18,
 		"weapons_small": 14, "weapons_medium": 12, "weapons_large": 2,
-		"box_small": 10, "box_medium": 6, "box_large": 0
+		"box_small": 15, "box_medium": 9, "box_large": 0
 	},
 	"weightsHigh": {
-		"tokens": 26, "credits": 22,
+		"tokens": 26, "credits": 14,
 		"weapons_small": 6, "weapons_medium": 14, "weapons_large": 8,
-		"box_small": 8, "box_medium": 11, "box_large": 5
+		"box_small": 11, "box_medium": 14, "box_large": 7
 	},
 
 	# ------------------------------------------------------------------ prizes

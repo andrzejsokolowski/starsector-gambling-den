@@ -5,6 +5,8 @@ import com.fs.starfarer.api.Global;
 
 import gamblingden.economy.TokenBank;
 import gamblingden.prizes.Prize;
+import gamblingden.prizes.WeaponPool;
+import gamblingden.economy.LegacyBarCleanup;
 
 /**
  * Reads the config on every load, so editing data/config/gambling_den.json and reloading a
@@ -22,6 +24,8 @@ public class GamblingDenModPlugin extends BaseModPlugin {
     public void onGameLoad(boolean newGame) {
         Config.load();
         TokenBank.migrateOldKeys();
+        LegacyBarCleanup.removeOldEvents();
+        WeaponPool.clearCache();
     }
 
     /**

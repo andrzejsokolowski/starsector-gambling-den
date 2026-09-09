@@ -53,9 +53,9 @@ public class Config {
         Map<Prize, Float>[] out = new HashMap[STAKE_COUNT];
         // tokens, credits, weapons s/m/l, boxes s/m/l
         float[][] rows = {
-                { 34f, 30f, 24f,  6f,  0f,  6f,  0f,  0f },
-                { 30f, 26f, 14f, 12f,  2f, 10f,  6f,  0f },
-                { 26f, 22f,  6f, 14f,  8f,  8f, 11f,  5f },
+                { 34f, 24f, 24f,  6f,  0f, 12f,  0f,  0f },
+                { 30f, 18f, 14f, 12f,  2f, 15f,  9f,  0f },
+                { 26f, 14f,  6f, 14f,  8f, 11f, 14f,  7f },
         };
         Prize[] paying = {
                 Prize.TOKENS, Prize.CREDITS,
@@ -81,8 +81,7 @@ public class Config {
     /** How many things this crate holds right now, slider included. */
     public static int countOf(Prize prize) {
         Integer set = luna(countKey(prize));
-        if (set != null && set > 0) return set;
-        return prize.count;
+        return Math.min(100, Math.max(1, set != null ? set : prize.count));
     }
 
     public static int creditsPaid(int stake) {
@@ -100,7 +99,7 @@ public class Config {
     /** Chance a single reel pays anything, as a fraction. */
     public static float hitChance(int stake) {
         Integer set = luna("gd_hit_" + stakeName(stake).toLowerCase());
-        if (set != null && set > 0) return set / 100f;
+        if (set != null) return Math.max(0f, Math.min(1f, set / 100f));
         return HIT_CHANCE[stake];
     }
 
@@ -134,7 +133,7 @@ public class Config {
             TOKENS_PER_CREDIT_OF_DUPLICATE =
                     (float) json.optDouble("tokensPerCreditOfDuplicate", TOKENS_PER_CREDIT_OF_DUPLICATE);
 
-            REELS_MAX = Math.max(1, json.optInt("reelsMax", REELS_MAX));
+            REELS_MAX = Math.min(5, Math.max(1, json.optInt("reelsMax", REELS_MAX)));
             REELS_DEFAULT = Math.min(REELS_MAX, Math.max(1, json.optInt("reelsDefault", REELS_DEFAULT)));
 
             readInts(json.optJSONArray("stakeCost"), STAKE_COST, 1);
@@ -161,11 +160,11 @@ public class Config {
                 }
             }
 
-            AMOUNT_VARIANCE = (float) json.optDouble("amountVariance", AMOUNT_VARIANCE);
+            AMOUNT_VARIANCE = (float) Math.max(0, Math.min(1, json.optDouble("amountVariance", AMOUNT_VARIANCE)));
             CREDITS_PER_BLUEPRINT_OWED =
-                    json.optInt("creditsPerBlueprintOwed", CREDITS_PER_BLUEPRINT_OWED);
+                    Math.max(0, Math.min(2000000, json.optInt("creditsPerBlueprintOwed", CREDITS_PER_BLUEPRINT_OWED)));
             DOUBLE_OR_NOTHING_WIN_CHANCE =
-                    (float) json.optDouble("doubleOrNothingWinChance", DOUBLE_OR_NOTHING_WIN_CHANCE);
+                    (float) Math.max(0, Math.min(1, json.optDouble("doubleOrNothingWinChance", DOUBLE_OR_NOTHING_WIN_CHANCE)));
 
         } catch (Exception e) {
             log.warn("Gambling Den: could not read " + Ids.CONFIG_PATH

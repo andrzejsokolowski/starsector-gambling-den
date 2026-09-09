@@ -19,9 +19,12 @@ it is rather than what it is worth on paper, so a pile of frigates is worth havi
 knocks a slice off. Your flagship is not for sale. Blueprint chips you have already read are
 worth tokens too.
 
+Selected ships get a named, itemised quote and a confirmation before sale. Removable weapons
+and fighter wings, including those on ship modules, return to your cargo.
+
 **Set the machine up.** One reel or five, low stakes or high. Each reel costs its own stake, so
 the pull costs what you tell it to cost. More reels is more chances at once; higher stakes puts
-better prizes on the strip, not better odds.
+larger prizes on the strip and raises the chance that an individual reel pays.
 
 **Pull.** Every reel is rolled and paid on its own — nothing has to line up. Most reels bust,
 the way a slot machine is supposed to; the ones that do not are worth having. Match every reel
@@ -36,6 +39,10 @@ mods you do not know, a box settles up in cash instead.
 
 **Double or nothing.** Win anything and you can risk the whole payout on one more roll. Slightly
 worse than even odds, because of course it is.
+
+Doubling stops before a prize can exceed 1 billion credits/tokens or 10,000 items. Closing the
+machine settles a paid spin and collects its winnings. The collection message reports what
+actually entered cargo, including credits substituted for unavailable hullmods.
 
 Every action has a button. Space pulls and Escape leaves, but neither is the only way to do it.
 
@@ -60,6 +67,24 @@ Requires LunaLib installed (it is found automatically under `mods/`). Set `stars
 ```
 
 The jar lands in `jars/`.
+
+Run `./gradlew check` for the standalone regression checks. They use mock campaign data and
+offscreen graphics; they do not open or change a live game. The graphics checks require the
+game's Windows native libraries. Run `./gradlew releaseZip` to check, build and package the mod
+with both icon sizes into `GamblingDen.zip`.
+
+## Changes in 0.4.2
+
+Hullmod boxes now make up 12%, 24% and 32% of winning symbols at low, mid and high stakes.
+The overall per-reel win chances remain 16%, 20% and 26%. At low stakes this is roughly one
+hullmod box per 18 three-reel pulls, up from one per 35.
+
+This update fixes ship equipment loss, ambiguous sale quotes, clipping of the UI, lost prizes
+when closing a spin, incorrect collection messages and payout overflow. Fighter-only,
+restricted, salvage-excluded and zero-rarity weapons are excluded from crates; zero-rarity
+hullmods are excluded too. Crate contents are fixed when a spin starts, so changing a slider
+cannot change an existing prize. Compatibility classes allow old bar events to be read and
+removed when loading earlier saves; no new bar events are created.
 
 ## Credits
 

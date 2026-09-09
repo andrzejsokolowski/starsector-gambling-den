@@ -19,7 +19,7 @@ public class TokenBank {
     private static int get(String key) {
         Map<String, Object> data = Global.getSector().getPersistentData();
         Object o = data.get(key);
-        if (o instanceof Number) return ((Number) o).intValue();
+        if (o instanceof Number) return (int) Math.max(0L, Math.min(Integer.MAX_VALUE, ((Number) o).longValue()));
         return 0;
     }
 
@@ -31,20 +31,22 @@ public class TokenBank {
         return get(Ids.KEY_TOKENS);
     }
 
-    public static void addTokens(int amount) {
-        set(Ids.KEY_TOKENS, Math.max(0, getTokens() + amount));
+    public static int addTokens(int amount) {
+        int paid = Math.max(0, Math.min(amount, Integer.MAX_VALUE - getTokens()));
+        set(Ids.KEY_TOKENS, getTokens() + paid);
+        return paid;
     }
 
     /** Takes the tokens if they are there. Returns false and takes nothing if they are not. */
     public static boolean spendTokens(int amount) {
-        if (getTokens() < amount) return false;
+        if (amount <= 0 || getTokens() < amount) return false;
         set(Ids.KEY_TOKENS, getTokens() - amount);
         return true;
     }
 
     public static void recordPull(boolean won) {
-        set(Ids.KEY_PULLS, get(Ids.KEY_PULLS) + 1);
-        if (won) set(Ids.KEY_WINS, get(Ids.KEY_WINS) + 1);
+        set(Ids.KEY_PULLS, (int) Math.min(Integer.MAX_VALUE, (long) get(Ids.KEY_PULLS) + 1));
+        if (won) set(Ids.KEY_WINS, (int) Math.min(Integer.MAX_VALUE, (long) get(Ids.KEY_WINS) + 1));
     }
 
     public static int getTotalPulls() {
@@ -80,7 +82,7 @@ public class TokenBank {
         Map<String, Object> data = Global.getSector().getPersistentData();
         Object oldTokens = data.get(Ids.OLD_KEY_TOKENS);
         if (oldTokens instanceof Number && getTokens() == 0) {
-            set(Ids.KEY_TOKENS, ((Number) oldTokens).intValue());
+            set(Ids.KEY_TOKENS, (int) Math.max(0L, Math.min(Integer.MAX_VALUE, ((Number) oldTokens).longValue())));
         }
         for (String key : Ids.OLD_KEYS) {
             data.remove(key);
