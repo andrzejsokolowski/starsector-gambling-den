@@ -10,12 +10,15 @@ gd_header_cash,Cash and tokens,Header,Cash and tokens,,,,,Payouts
 gd_credits_low,Credits at low stakes,Int,8000,,Credits the cash symbol pays at low stakes.,100,2000000,Payouts
 gd_credits_mid,Credits at mid stakes,Int,25000,,Credits the cash symbol pays at mid stakes.,100,2000000,Payouts
 gd_credits_high,Credits at high stakes,Int,60000,,Credits the cash symbol pays at high stakes.,100,2000000,Payouts
+gd_credits_max,Credits at max stakes,Int,120000,,Credits the cash symbol pays at max stakes.,100,2000000,Payouts
 gd_tokens_low,Tokens at low stakes,Int,8,,Tokens the token symbol pays at low stakes.,1,1000,Payouts
 gd_tokens_mid,Tokens at mid stakes,Int,20,,Tokens the token symbol pays at mid stakes.,1,1000,Payouts
 gd_tokens_high,Tokens at high stakes,Int,45,,Tokens the token symbol pays at high stakes.,1,1000,Payouts
+gd_tokens_max,Tokens at max stakes,Int,90,,Tokens the token symbol pays at max stakes.,1,1000,Payouts
 gd_header_odds,Odds,Header,Odds,,,,,Odds
 gd_hit_low,Chance a reel pays - low stakes,Int,16,,"Percent chance that one reel lands on something rather than busting. Each reel is rolled on its own, so five reels get five of these.",1,100,Odds
 gd_hit_mid,Chance a reel pays - mid stakes,Int,20,,Percent chance that one reel lands on something rather than busting.,1,100,Odds
 gd_hit_high,Chance a reel pays - high stakes,Int,26,,Percent chance that one reel lands on something rather than busting.,1,100,Odds
+gd_hit_max,Chance a reel pays - max stakes,Int,32,,Percent chance that one reel lands on something rather than busting.,1,100,Odds
 gd_header_tokens,Buying tokens,Header,Buying tokens,,,,,Odds
 gd_ship_tokens_per_fp,Tokens per fleet point,Double,1.5,,"What the keeper pays for a hull, per fleet point. At 1.5 a Kite is about 5 tokens, a Hammerhead 15 and an Onslaught 45. Each d-mod knocks 10 percent off.",0.1,20,Odds

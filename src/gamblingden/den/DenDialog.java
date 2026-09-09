@@ -23,7 +23,8 @@ import gamblingden.slots.SlotMachineDialogDelegate;
 import gamblingden.slots.SlotMachinePanel;
 
 /**
- * The den itself: the keeper, the counter, and the way through to the machine.
+ * The shared venue: the keeper, the counter, and game selection. Slots is the first game;
+ * future games get their own menu entries and rules while sharing the token balance.
  *
  * Reached from the "Visit the gambling den" option on any port of size 6 or more, which is
  * added by data/campaign/rules.csv. Takes over the port conversation while you are in there
@@ -80,11 +81,11 @@ public class DenDialog implements InteractionDialogPlugin {
                 tokens + (tokens == 1 ? " token" : " tokens"));
 
         int cheapest = SlotMachine.costOf(1, 0);
-        options.addOption("Play the machine", OPTION_PLAY);
+        options.addOption("Play slots", OPTION_PLAY);
         if (tokens < cheapest) {
             options.setEnabled(OPTION_PLAY, false);
-            options.setTooltip(OPTION_PLAY, "The cheapest pull on the machine is " + cheapest
-                    + " tokens - one reel at low stakes. You have " + tokens + ".");
+            options.setTooltip(OPTION_PLAY, "The cheapest pull costs " + cheapest
+                    + (cheapest == 1 ? " token" : " tokens") + ". You have " + tokens + ".");
         }
 
         options.addOption("Sell a hull to the keeper", OPTION_SELL_SHIP);

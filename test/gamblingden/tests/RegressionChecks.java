@@ -39,6 +39,7 @@ public class RegressionChecks {
     private static final Map<String, Integer> guns = new HashMap<>(), wings = new HashMap<>();
     private static final Map<Object, String> options = new LinkedHashMap<>();
     private static final List<String> text = new ArrayList<>();
+    private static final List<String> labelCaptions = new ArrayList<>();
     private static double credits;
     private static int assertions, dismissals;
     private static PositionAPI position;
@@ -103,7 +104,7 @@ public class RegressionChecks {
     private static void reset() {
         saved.clear(); chips.clear(); known.clear(); hullmods.clear(); weapons.clear(); fleet.clear();
         guns.clear(); wings.clear(); text.clear(); options.clear(); credits=0; dismissals=0;
-        drawnIcons.clear(); recordIcons=false;
+        drawnIcons.clear(); labelCaptions.clear(); recordIcons=false;
         WeaponPool.clearCache();
     }
     private static void setup() {
@@ -161,7 +162,7 @@ public class RegressionChecks {
             case "getHullModSpec" -> hullmods.stream().filter(s->s.getId().equals(a[0])).findFirst().orElse(null);
             case "getScreenScaleMult" -> 1f;
             case "getSprite" -> recordIcons ? sprite((String)a[0]) : null;
-            case "createLabel" -> label();
+            case "createLabel" -> { labelCaptions.add((String)a[0]); yield label(); }
             default -> null;
         }));
         Global.setSoundPlayer(proxy(SoundPlayerAPI.class,(m,a)->null));
@@ -320,13 +321,14 @@ public class RegressionChecks {
             if(close.equals("leave")) invoke(panel,"act",String.class,"leave");
             if(close.equals("external")) new SlotMachineDialogDelegate(panel,()->{}).reportDismissed(0);
             panel.finishOnDismissal(); panel.processInput(List.of(key(Keyboard.KEY_SPACE),key(Keyboard.KEY_D)));
-            check(TokenBank.getTokens()==94 && credits==20000,"Closing lost or repeated payout: "+close);
+            check(TokenBank.getTokens()==100-SlotMachine.costOf(Config.REELS_DEFAULT,0) && credits==20000,"Closing lost or repeated payout: "+close);
             check(TokenBank.getTotalPulls()==1,"Closing recorded spin twice");
         }
         reset(); saved.put(Ids.KEY_TOKENS,100);
         SlotMachinePanel panel=machine();
+        check(labelCaptions.contains("SLOTS") && !labelCaptions.contains("GAMBLING DEN"),"Venue name is still used as the machine title");
         invoke(panel,"act",String.class,"reels:2"); invoke(panel,"act",String.class,"reels:3");
-        invoke(panel,"act",String.class,"stake:1"); invoke(panel,"act",String.class,"stake:2");
+        for(int stake=0;stake<Config.STAKE_COUNT;stake++) invoke(panel,"act",String.class,"stake:"+stake);
         int checkedReels=0,checkedStakes=0;
         for(Object button:(List<?>)get(panel,"buttons")) {
             if((Boolean)get(button,"checked")) {
@@ -375,12 +377,14 @@ public class RegressionChecks {
         Pbuffer buffer=new Pbuffer(1200,800,new PixelFormat(),null);
         try {
             buffer.makeCurrent();
-            for(Prize featured:Prize.values()) for(int count=1;count<=5;count++) for(int skip:new int[]{-1,0,90}) {
+            for(int stake=0;stake<Config.STAKE_COUNT;stake++) for(Prize featured:Prize.values())
+              for(int count=1;count<=5;count++) for(int skip:new int[]{-1,0,90}) {
                 reset(); recordIcons=true; saved.put(Ids.KEY_TOKENS,10000);
                 for(int i=0;i<100;i++) hullmods.add(hullmod("display"+i,1));
                 weapons.add(weapon("displayWeapon",1,false));
                 SlotMachinePanel panel=machine();
                 invoke(panel,"act",String.class,"reels:"+count);
+                invoke(panel,"act",String.class,"stake:"+stake);
                 invoke(panel,"act",String.class,"pull");
                 List<Prize> symbols=new ArrayList<>();
                 Payout payout=new Payout();
@@ -419,6 +423,7 @@ public class RegressionChecks {
                     check(((LabelAPI)get(panel,"resultLabel")).getText().equals("Collected: "+receipt.describe()+"."),"Collected text differs from receipt");
                     check(chips.size()==receipt.getBlueprints() && guns.getOrDefault("displayWeapon",0)==receipt.getWeapons()
                             && credits==receipt.getCredits(),"Cargo differs from displayed receipt");
+                    check(TokenBank.getTokens()==10000-SlotMachine.costOf(count,stake)+receipt.getTokens(),"Token cost or reward differs from the selected stake");
                 }
             }
             // After a completed pull, changing settings must not pair new decorative icons
@@ -449,19 +454,48 @@ public class RegressionChecks {
         Method method=instance.getClass().getDeclaredMethod(name,types); method.setAccessible(true); method.invoke(instance,args);
     }
     private static void odds() {
-        double[] expected={.0192,.048,.0832};
-        for(int stake=0;stake<3;stake++) {
+        double[] expected={.0192,.048,.0832,.128};
+        for(int stake=0;stake<Config.STAKE_COUNT;stake++) {
             Random random=new Random(30+stake); int boxes=0; int count=100000;
             for(int i=0;i<count;i++) if(SlotMachine.pull(1,stake,random).symbols.get(0).isBox()) boxes++;
             check(Math.abs((double)boxes/count-expected[stake])<.003,"Unexpected hullmod odds at stake "+stake);
             System.out.printf("Hullmod box rate, stake %d: %.2f%%%n",stake,100d*boxes/count);
         }
     }
+    private static void stakes() throws Exception {
+        reset();
+        int[] costs={1,2,4,8};
+        check(Config.STAKE_COUNT==4 && Arrays.equals(Config.STAKE_COST,costs),"Stake levels or prices differ from 1/2/4/8");
+        for(int stake=0;stake<costs.length;stake++) {
+            check(!Config.WEIGHTS[stake].isEmpty(),"Fourth stake has no prize pool");
+            TokenBank.setStake(stake); check(TokenBank.getStake()==stake,"Stake preference was not preserved");
+            for(int reels=1;reels<=5;reels++) check(SlotMachine.costOf(reels,stake)==costs[stake]*reels,"Wrong cost per reel");
+        }
+        SlotMachinePanel panel=machine();
+        List<?> buttons=(List<?>)get(panel,"buttons");
+        int count=0;
+        float previousRight=0f;
+        for(Object button:buttons) {
+            if(!((String)get(button,"action")).startsWith("stake:")) continue;
+            float x=(Float)get(button,"x"), width=(Float)get(button,"w");
+            check(x>=previousRight && x+width<=SlotMachinePanel.PANEL_W,"Four stake buttons overlap or leave the panel");
+            previousRight=x+width; count++;
+        }
+        check(count==4,"Fourth stake button is missing");
+        check(labelCaptions.containsAll(List.of("1 token","2 tokens","4 tokens","8 tokens")),"Stake buttons do not show their per-reel costs");
+        saved.put(Ids.KEY_TOKENS,39);
+        invoke(panel,"act",String.class,"reels:5"); invoke(panel,"act",String.class,"stake:3");
+        panel.processInput(List.of(key(Keyboard.KEY_SPACE)));
+        check(TokenBank.getTokens()==39 && get(panel,"pending")==null,"Unaffordable 40-token spin was allowed");
+        TokenBank.addTokens(1); panel.processInput(List.of(key(Keyboard.KEY_SPACE)));
+        check(TokenBank.getTokens()==0 && ((SpinResult)get(panel,"pending")).symbols.size()==5,"Max stake did not charge exactly 40 tokens");
+        panel.finishOnDismissal();
+    }
     public static void main(String[] args) throws Exception {
         if(args.length>0 && args[0].equals("fast-renderer")) {
             setup(); FastRendererChecks.run(RegressionChecks::machine); return;
         }
-        setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); odds();
+        setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }

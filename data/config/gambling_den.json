@@ -16,13 +16,13 @@
 	# ------------------------------------------------------------------ machine
 	"reelsDefault": 3,
 	"reelsMax": 5,
-	# What one reel costs at each stake, low / mid / high. The pull costs this times the reels.
-	"stakeCost": [2, 5, 12],
+	# Slots: cost per reel at low / mid / high / max stakes. Other games can use their own rules.
+	"stakeCost": [1, 2, 4, 8],
 
 	# ------------------------------------------------------------------- odds
 	# The chance one reel lands on anything at all. Everything else is a bust, and a bust is
 	# meant to be the ordinary outcome. Overridden by the sliders.
-	"hitChance": [0.16, 0.20, 0.26],
+	"hitChance": [0.16, 0.20, 0.26, 0.32],
 
 	# Relative prize weights once a reel wins. Higher stakes also unlock bigger crates.
 	"weightsLow": {
@@ -40,6 +40,11 @@
 		"weapons_small": 6, "weapons_medium": 14, "weapons_large": 8,
 		"box_small": 11, "box_medium": 14, "box_large": 7
 	},
+	"weightsMax": {
+		"tokens": 22, "credits": 10,
+		"weapons_small": 4, "weapons_medium": 12, "weapons_large": 12,
+		"box_small": 10, "box_medium": 16, "box_large": 14
+	},
 
 	# ------------------------------------------------------------------ prizes
 	# Fallbacks for the sliders, used if LunaLib is not answering.
@@ -47,8 +52,8 @@
 		"box_small": 3, "box_medium": 6, "box_large": 10,
 		"weapons_small": 2, "weapons_medium": 5, "weapons_large": 12
 	},
-	"creditsPaid": [8000, 25000, 60000],
-	"tokensPaid": [8, 20, 45],
+	"creditsPaid": [8000, 25000, 60000, 120000],
+	"tokensPaid": [8, 20, 45, 90],
 
 	# Cash and token payouts vary by up to this fraction either way.
 	"amountVariance": 0.25,

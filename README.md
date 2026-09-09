@@ -7,6 +7,10 @@ blueprints.
 Gathering hull mods from salvage is slow. This gives you something else to do with the pile of
 recovered frigates you are never going to fly.
 
+Gambling Den is the venue, not the name of a machine. **Slots** is its first game; other
+gambling games are planned. They will share the den and token balance, with their own rules
+and settings. Add future game choices to the den menu rather than treating Slots as the venue.
+
 ## How it works
 
 **Find it.** *Visit the gambling den* is its own option when you dock at any port of size 6 or
@@ -22,7 +26,7 @@ worth tokens too.
 Selected ships get a named, itemised quote and a confirmation before sale. Removable weapons
 and fighter wings, including those on ship modules, return to your cargo.
 
-**Set the machine up.** One reel or five, low stakes or high. Each reel costs its own stake, so
+**Set the machine up.** One reel or five, with stakes of **1, 2, 4 or 8 tokens per reel**. Each reel costs its own stake, so
 the pull costs what you tell it to cost. More reels is more chances at once; higher stakes puts
 larger prizes on the strip and raises the chance that an individual reel pays.
 
@@ -54,7 +58,7 @@ what the cash and token symbols pay at each stake, the chance a reel pays anythi
 what the keeper gives per fleet point of hull.
 
 **`data/config/gambling_den.json`** holds the deeper wiring — reel costs, the reel strip weights
-for all three stakes, the payout variance and the double-or-nothing chance. Edit and reload a
+for all four stakes, the payout variance and the double-or-nothing chance. Edit and reload a
 save; no rebuild.
 
 ## Building
@@ -76,6 +80,16 @@ with both icon sizes into `GamblingDen.zip`.
 If `fr.jar` is installed in `starsector-core`, the checks also send 600 panel frames through
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
+
+## Changes in 0.5.0
+
+Slots has four stake levels at 1, 2, 4 and 8 tokens per reel. The buttons show those costs.
+The fourth level, Max, defaults to a 32% hit chance and cash/token prizes of 120,000 credits
+or 90 tokens before variance. Hullmod boxes make up 40% of its winning symbols. Its hit chance
+and cash/token payouts have their own LunaLib sliders; the other three levels retain their
+previous reward settings. The cabinet is titled Slots, and the den menu offers Play slots.
+
+Includes the display fixes below and the Fast Rendering crash fix.
 
 ## Changes in 0.4.4
 

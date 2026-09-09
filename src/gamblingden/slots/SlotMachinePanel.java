@@ -202,7 +202,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
         tokenLabel = addLabel("", Color.WHITE, 0f, Y_TOKENS, PANEL_W, LABEL_H,
                 Alignment.MID, Fonts.DEFAULT_SMALL);
 
-        addLabel("GAMBLING DEN", TRIM, 0f, Y_CABINET + 14f, PANEL_W, 24f,
+        addLabel("SLOTS", TRIM, 0f, Y_CABINET + 14f, PANEL_W, 24f,
                 Alignment.MID, Fonts.ORBITRON_20AA);
 
         for (int i = 0; i < Config.REELS_MAX; i++) {
@@ -261,7 +261,8 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
                 Alignment.RMID, Fonts.DEFAULT_SMALL);
         x += 74f;
         for (int i = 0; i < Config.STAKE_COUNT; i++) {
-            addButton(ACT_STAKE + i, Config.stakeName(i), x, Y_SETUP, stakeBtnW, H_SETUP);
+            int cost = SlotMachine.costOf(1, i);
+            addButton(ACT_STAKE + i, cost + (cost == 1 ? " token" : " tokens"), x, Y_SETUP, stakeBtnW, H_SETUP);
             x += stakeBtnW + small;
         }
 

@@ -24,7 +24,8 @@ public class Config {
 
     private static final Logger log = Global.getLogger(Config.class);
 
-    public static final int STAKE_COUNT = 3;
+    /** These stake and prize settings belong to Slots, not to every future game in the den. */
+    public static final int STAKE_COUNT = 4;
 
     public static float SHIP_TOKENS_PER_FP = 1.5f;
     public static float SHIP_TOKEN_PENALTY_PER_DMOD = 0.1f;
@@ -32,17 +33,17 @@ public class Config {
 
     public static int REELS_DEFAULT = 3;
     public static int REELS_MAX = 5;
-    public static int[] STAKE_COST = { 2, 5, 12 };
+    public static int[] STAKE_COST = { 1, 2, 4, 8 };
 
     /** The chance a single reel pays anything at all. The rest of the time it busts. */
-    public static float[] HIT_CHANCE = { 0.16f, 0.20f, 0.26f };
+    public static float[] HIT_CHANCE = { 0.16f, 0.20f, 0.26f, 0.32f };
 
     /** Relative weights among the symbols that do pay, one map per stake. */
     public static Map<Prize, Float>[] WEIGHTS = defaultWeights();
 
     /** Credits and tokens paid by those symbols, one entry per stake. */
-    public static int[] CREDITS_PAID = { 8000, 25000, 60000 };
-    public static int[] TOKENS_PAID = { 8, 20, 45 };
+    public static int[] CREDITS_PAID = { 8000, 25000, 60000, 120000 };
+    public static int[] TOKENS_PAID = { 8, 20, 45, 90 };
 
     public static float AMOUNT_VARIANCE = 0.25f;
     public static int CREDITS_PER_BLUEPRINT_OWED = 20000;
@@ -56,6 +57,7 @@ public class Config {
                 { 34f, 24f, 24f,  6f,  0f, 12f,  0f,  0f },
                 { 30f, 18f, 14f, 12f,  2f, 15f,  9f,  0f },
                 { 26f, 14f,  6f, 14f,  8f, 11f, 14f,  7f },
+                { 22f, 10f,  4f, 12f, 12f, 10f, 16f, 14f },
         };
         Prize[] paying = {
                 Prize.TOKENS, Prize.CREDITS,
@@ -151,6 +153,7 @@ public class Config {
             readWeights(json, "weightsLow", 0);
             readWeights(json, "weightsMid", 1);
             readWeights(json, "weightsHigh", 2);
+            readWeights(json, "weightsMax", 3);
 
             JSONObject counts = json.optJSONObject("crateContents");
             if (counts != null) {
@@ -194,7 +197,8 @@ public class Config {
         switch (stake) {
             case 0: return "Low";
             case 1: return "Mid";
-            default: return "High";
+            case 2: return "High";
+            default: return "Max";
         }
     }
 }
