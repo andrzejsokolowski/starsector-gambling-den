@@ -1,13 +1,13 @@
 # Gambling Den
 
 A back-room gambling den at every port of size 6 or more. Sell surplus hulls for tokens,
-then play Slots or Pachinko for hullmod blueprints, weapons, tokens, and more.
+then play Slots, Pachinko, or Blackjack for hullmod blueprints, weapons, tokens, and more.
 
 Gathering hull mods from salvage is slow. This gives you something else to do with the pile of
 recovered frigates you are never going to fly.
 
-Gambling Den is the venue, not the name of a machine. **Slots** and **Pachinko** share the den
-and token balance, with their own rules and settings. Card games are planned for later updates.
+Gambling Den is the venue, not the name of a machine. Slots, Pachinko, and Blackjack share the den
+and token balance, with their own rules. Poker is planned for a later update.
 
 ## How it works
 
@@ -64,18 +64,22 @@ The pocket amounts, from left to right, are:
 
 These are direct quantities. An 8 on the hullmod board gives eight random blueprint chips,
 not eight boxes and not a second roll for a prize. The centre pays nothing; the outer pockets
-are the rare large wins. Each landing adds its reward to the pending winnings total.
-The game generates items and transfers all winnings when you leave the Pachinko screen.
-Pending winnings remain across batches and category changes. Token wins and refunds also wait
-until you leave, so they cannot pay for more balls during the same visit.
+are the rare large wins. Each landing adds item rewards to the pending winnings total.
+The game generates and transfers items when you leave the Pachinko screen.
+Pending items remain across batches and category changes. Token wins and refunds pay on landing,
+so you can immediately use them to buy more balls.
+
+Each weapon gets a separate random draw. Within one ball's reward, a weapon cannot repeat
+until every eligible weapon type appears. A reward larger than the eligible pool starts another
+cycle through that pool. Different balls can still give the same weapon.
 
 Each visible ball's actual landing pocket decides its reward. Ball-to-ball collisions can
 change its path and result. All balls share one fixed-step simulation, so frame rate does not
 change the result for the same launches. Finish all advances that same shared simulation without collecting rewards.
 Leave & collect, Escape, and an external dialog closure finish every purchased ball and collect the winnings once.
 This includes queued balls. An exceptional stuck ball refunds its price.
-The result line totals the pending rewards and refunds for the run.
-The To collect line shows the combined winnings for the whole visit.
+The result line totals the rewards and refunds for the run.
+The To collect line shows only the pending items for the whole visit.
 
 Before a hullmod run, pocket amounts are capped to the number of eligible blueprints left.
 During a run, the displayed board stays fixed and balls share the remaining stock.
@@ -93,6 +97,26 @@ board without charging; click again to accept it.
 
 Category choices are mutually exclusive and stay locked while balls remain. All actions are
 clickable. Space adds one ball, including during a run; Escape leaves. There are no tutorial panels.
+
+## Blackjack
+
+Play blackjack opens a separate card table in the den. Choose an even bet from 2 to 1,000 tokens,
+then press Deal. Hit, Stand, Double, Split, and Leave each have a mouse button.
+Bet buttons and the -2, +2, and x2 controls work between rounds.
+
+The table uses six shuffled decks and reshuffles between rounds when fewer than 52 cards remain.
+The dealer stands on soft 17, a hand with an ace counted as 11. An opening blackjack pays 3:2
+profit, an ordinary win pays 1:1, and a push returns the bet. Even bets keep these payouts exact
+in whole tokens. The dealer checks for an opening blackjack before you can place extra bets.
+
+Double takes one additional bet, draws one card, and ends that hand. Split accepts two cards of
+the same rank and takes one additional bet. You can split once and double after a split.
+Split aces receive one additional card each and stand. A split hand with 21 pays as an ordinary win.
+This table has no insurance, surrender, loans, or credit bets.
+
+Winnings enter the token balance when the round ends. During a round, the exit button reads
+Stand & leave. That button, Escape, and an external closure stand on unfinished hands and resolve
+the dealer once. Leaving cannot cancel a paid bet or collect it twice.
 
 ## Tuning
 
@@ -126,9 +150,24 @@ offscreen graphics; they do not open or change a live game. The graphics checks 
 game's Windows native libraries. Run `./gradlew releaseZip` to check, build and package the mod
 with both icon sizes into `GamblingDen.zip`.
 
-If `fr.jar` is installed in `starsector-core`, the checks also send 1,200 panel frames through
+If `fr.jar` is installed in `starsector-core`, the checks also send 1,800 panel frames through
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
+
+## Changes in 1.2.0
+
+Adds Blackjack with token bets, a six-deck table, 3:2 blackjack payouts, splitting, and doubling.
+The model adapts Interastral Peace Casino code under its non-commercial reuse terms.
+The card drawings and interface are new. The release includes the original code notice and credits
+in `THIRD_PARTY_NOTICES.txt`. Interastral Peace Casino does not need to be installed.
+
+Pachinko token wins and refunds now pay on landing. Only items wait for collection on exit.
+Weapon rewards now draw without repeats within each ball until the eligible pool runs out.
+The user confirmed that deferred item collection works in game. Slots rules and odds are unchanged.
+
+Tests cover 20,000 blackjack rounds, fixed card sequences, split hands, dealer blackjacks, mouse
+buttons, safe exits, and Fast Rendering. Weapon tests cover distinct four-weapon rewards,
+small pools, and varied draws. Blackjack and the latest Pachinko changes still need an in-game test.
 
 ## Changes in 1.1.2
 
@@ -139,7 +178,7 @@ including token wins and refunds. Weapon rewards of the same type enter cargo to
 
 Tests cover mixed rewards, 20,000 pending weapons, stock reservations, refunds, category changes,
 and collection through every exit. They also reject item generation and cargo access during play.
-The Fast Rendering compatibility tests pass. The landing-lag fix still needs an in-game test.
+The Fast Rendering compatibility tests pass. The user confirmed that deferred collection works in game.
 Slots rules, ball prices, pocket amounts, and ball physics are unchanged.
 
 ## Changes in 1.1.1
@@ -212,6 +251,7 @@ removed when loading earlier saves; no new bar events are created.
 ## Credits
 
 The cabinet owes its shape to the Tachy-Impact machine in **Interastral Peace Casino** by Emanon6
-and WolframSegler, which is shared for free non-commercial use. Its blackjack and poker sources
-have been inspected as references for future card games. No card-game code or assets are
-included in this release; Pachinko is an original implementation.
+and WolframSegler, which is shared for free non-commercial use. Blackjack adapts its rules model
+with token accounting and corrections for split hands and dealer blackjacks.
+`THIRD_PARTY_NOTICES.txt` preserves the applicable notice. No Interastral card art, music, or logos
+are included. Pachinko, the blackjack interface, and its card drawings are original implementations.

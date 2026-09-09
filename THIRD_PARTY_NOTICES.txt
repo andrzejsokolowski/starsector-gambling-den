@@ -1,0 +1,16 @@
+Interastral Peace Casino
+Authors: Emanon6 and WolframSegler
+Reference version: 1.6.3
+
+The blackjack rules model in src/gamblingden/blackjack/BlackjackGame.java is
+adapted from Interastral Peace Casino's BlackjackGame.java and Deck.java.
+Its original notice in Licences.txt, under "For the rest of the mod:", is:
+
+Free to use, modify and redistribute for non commercial purposes.
+
+This permission applies to the adapted code. Changes include token accounting,
+bet validation, dealer-blackjack precedence, corrected split-hand settlement,
+split-ace rules, exact integer payouts, incremental dealer play, and safe exits.
+
+The Gambling Den blackjack interface and card drawings are new code. No
+Interastral card artwork, music, logos, or other assets are redistributed.

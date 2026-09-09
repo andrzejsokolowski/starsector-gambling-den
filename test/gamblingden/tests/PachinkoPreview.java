@@ -56,7 +56,7 @@ public final class PachinkoPreview {
         captions.add(c); return c.label;
     }
 
-    private static void save(PachinkoPanel panel, String name) throws Exception {
+    private static void save(com.fs.starfarer.api.campaign.BaseCustomUIPanelPlugin panel, String name) throws Exception {
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
         panel.renderBelow(1);
         ByteBuffer pixels=BufferUtils.createByteBuffer(1000*660*4);
@@ -77,7 +77,7 @@ public final class PachinkoPreview {
             g.drawString(c.text,c.x+(c.w-fm.stringWidth(c.text))/2,c.y+fm.getAscent());
         }
         g.dispose();
-        File output=new File("build/pachinko-"+name+".png"); output.getParentFile().mkdirs();
+        File output=new File("build/"+(panel instanceof PachinkoPanel?"pachinko-":"blackjack-")+name+".png"); output.getParentFile().mkdirs();
         ImageIO.write(image,"png",output);
         System.out.println(output.getAbsolutePath());
     }
@@ -96,6 +96,7 @@ public final class PachinkoPreview {
             if(m.getName().equals("addComponent")) for(Caption c:captions) if(c.label==a[0]) return c.position;
             return null;
         });
+        if(args.length>0 && args[0].equals("blackjack")) { blackjack(ui); return; }
         PachinkoPanel panel=new PachinkoPanel(); panel.init(ui,null);
         Caption bounds=new Caption(); bounds.w=1000; bounds.h=660; panel.positionChanged(position(bounds));
         Pbuffer buffer=new Pbuffer(1000,660,new PixelFormat(),null);
@@ -119,6 +120,39 @@ public final class PachinkoPreview {
             for(int frame=0;frame<80;frame++) panel.advance(1f/60);
             save(panel,"multiball");
             act.invoke(panel,"skip"); save(panel,"batch-paid");
+        } finally { buffer.destroy(); }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void blackjack(CustomPanelAPI ui) throws Exception {
+        var panel=new gamblingden.blackjack.BlackjackPanel(); panel.init(ui,null);
+        Caption bounds=new Caption(); bounds.w=1000; bounds.h=660; panel.positionChanged(position(bounds));
+        Field gameField=panel.getClass().getDeclaredField("game"); gameField.setAccessible(true);
+        var game=(gamblingden.blackjack.BlackjackGame)gameField.get(panel);
+        Method act=panel.getClass().getDeclaredMethod("act",String.class); act.setAccessible(true);
+        Pbuffer buffer=new Pbuffer(1000,660,new PixelFormat(),null);
+        try {
+            buffer.makeCurrent(); GL11.glViewport(0,0,1000,660);
+            GL11.glMatrixMode(GL11.GL_PROJECTION); GL11.glLoadIdentity(); GL11.glOrtho(0,1000,0,660,-1,1);
+            GL11.glMatrixMode(GL11.GL_MODELVIEW); GL11.glLoadIdentity();
+            save(panel,"ready");
+            BlackjackChecks.rig(game,8,10,8,6,3,2,10,10,4);
+            act.invoke(panel,"deal"); save(panel,"player");
+            act.invoke(panel,"split"); save(panel,"split");
+            act.invoke(panel,"double"); save(panel,"second-hand");
+            act.invoke(panel,"double"); save(panel,"dealer");
+            panel.advance(.5f); save(panel,"result");
+            act.invoke(panel,"bet:20"); BlackjackChecks.rig(game,8,10,8,6,3,2);
+            act.invoke(panel,"deal"); act.invoke(panel,"split");
+            // Layout stress only: two twenty-card hands, without changing gameplay rules.
+            Field cards=gamblingden.blackjack.BlackjackGame.Hand.class.getDeclaredField("cards"); cards.setAccessible(true);
+            for(var hand:game.hands()) {
+                var list=(List<gamblingden.blackjack.BlackjackGame.Card>)cards.get(hand); list.clear();
+                for(int i=0;i<20;i++) list.add(new gamblingden.blackjack.BlackjackGame.Card(1,
+                        gamblingden.blackjack.BlackjackGame.Suit.values()[i%4]));
+            }
+            Method refresh=panel.getClass().getDeclaredMethod("refresh"); refresh.setAccessible(true); refresh.invoke(panel);
+            save(panel,"crowded");
         } finally { buffer.destroy(); }
     }
 }

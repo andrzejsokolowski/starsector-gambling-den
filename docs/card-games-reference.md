@@ -1,7 +1,7 @@
 # Interastral card-game reference
 
-Inspected on 2026-09-09, at the user's request, while adding Pachinko. Blackjack is a later
-addition, not part of 1.1.0. The user explicitly welcomes adapting Interastral's implementation.
+Inspected on 2026-09-09 at the user's request. Version 1.2.0 adapts the blackjack rules model
+with token accounting and corrected settlement. The user explicitly requested this reuse.
 
 Source installed at `D:/Games/StarSector/mods/Interastral Peace Casino-1.6.3/`.
 `mod_info.json` names Emanon6 and WolframSegler as authors.
@@ -47,3 +47,13 @@ Keep the den's no-credit-purchases rule, mouse-only controls, independent game t
 safe dialog-close behavior. Test split hands, doubled bets, pushes, natural blackjacks,
 insufficient tokens, overflow and repeated callbacks. Rendering must not query GL state
 from the app thread, because the user's Fast Rendering bridge stalls on those queries.
+
+## Implemented in 1.2.0
+
+Blackjack uses six decks, an early dealer-blackjack check, soft-17 stands, and one split.
+Split aces receive one card each. Bets use even token amounts so the 3:2 payout stays exact.
+Closing stands on remaining hands and resolves the dealer once.
+
+The table and card drawings use new code, with no imported artwork or asset dependencies.
+`THIRD_PARTY_NOTICES.txt` contains the source attribution and original non-commercial code notice.
+Tests cover the three source issues above, token accounting, split doubles, exits, and the graphics bridge.

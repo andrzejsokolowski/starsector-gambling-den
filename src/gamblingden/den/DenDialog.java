@@ -23,6 +23,8 @@ import gamblingden.slots.SlotMachineDialogDelegate;
 import gamblingden.slots.SlotMachinePanel;
 import gamblingden.pachinko.PachinkoPanel;
 import gamblingden.pachinko.PachinkoDialogDelegate;
+import gamblingden.blackjack.BlackjackPanel;
+import gamblingden.blackjack.BlackjackDialogDelegate;
 
 /**
  * The shared venue: the keeper, the counter, and game selection. Slots is the first game;
@@ -36,6 +38,7 @@ public class DenDialog implements InteractionDialogPlugin {
 
     private static final String OPTION_PLAY = "gd_play";
     private static final String OPTION_PACHINKO = "gd_pachinko";
+    private static final String OPTION_BLACKJACK = "gd_blackjack";
     private static final String OPTION_SELL_SHIP = "gd_sell_ship";
     private static final String OPTION_SELL_CHIPS = "gd_sell_chips";
     private static final String OPTION_LEAVE = "gd_leave";
@@ -92,6 +95,7 @@ public class DenDialog implements InteractionDialogPlugin {
         }
 
         options.addOption("Play pachinko", OPTION_PACHINKO);
+        options.addOption("Play blackjack", OPTION_BLACKJACK);
 
         options.addOption("Sell a hull to the keeper", OPTION_SELL_SHIP);
         if (ShipTradeIn.getTradeableShips().isEmpty()) {
@@ -127,6 +131,15 @@ public class DenDialog implements InteractionDialogPlugin {
                             for (String line : game.getSessionLog()) text.addPara(line);
                             showMenu();
                         }
+                    }));
+
+        } else if (OPTION_BLACKJACK.equals(optionData)) {
+            final BlackjackPanel game = new BlackjackPanel();
+            dialog.showCustomVisualDialog(BlackjackPanel.PANEL_W, BlackjackPanel.PANEL_H,
+                    new BlackjackDialogDelegate(game, () -> {
+                        String summary = game.getSessionSummary();
+                        if (!summary.isEmpty()) text.addPara(summary);
+                        showMenu();
                     }));
 
         } else if (OPTION_SELL_SHIP.equals(optionData)) {

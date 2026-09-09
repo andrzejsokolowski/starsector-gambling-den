@@ -84,7 +84,6 @@ public final class PachinkoRound {
         if (cost > TokenBank.getTokens()) return batch;
         for (int i = 0; i < count; i++) batch.add(new PachinkoRound(shown, random, winnings));
         if (!TokenBank.spendTokens((int) cost)) batch.clear();
-        else winnings.purchased((int) cost);
         return batch;
     }
 
@@ -97,7 +96,7 @@ public final class PachinkoRound {
 
     public boolean isSettled() { return settled; }
     public String getResult() { return result; }
-    /** Reserved quantities, not cargo transfers. The visit collects them on exit. */
+    /** Item quantities are reserved for exit; token quantities are already paid. */
     public int getAwarded() { return awarded; }
     public int getRefunded() { return refunded; }
     public PachinkoWinnings getWinnings() { return winnings; }

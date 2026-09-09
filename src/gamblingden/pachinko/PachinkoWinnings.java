@@ -19,9 +19,9 @@ import gamblingden.prizes.WeaponPool;
 public final class PachinkoWinnings {
     private int hullmodsLeft = BlueprintPool.getEligible().size();
     private final boolean weaponsAvailable = !WeaponPool.isEmpty();
-    private long tokenRoom = (long) Integer.MAX_VALUE - TokenBank.getTokens();
     private long blueprints, weapons, tokens, refunds, weaponBetCosts;
     private final List<HullLot> hullLots = new ArrayList<HullLot>();
+    private final Map<Integer, Long> weaponLots = new LinkedHashMap<Integer, Long>();
     private Receipt collected;
 
     private static final class HullLot {
@@ -30,7 +30,7 @@ public final class PachinkoWinnings {
     }
 
     public int hullmodsLeft() { return hullmodsLeft; }
-    public long tokenRoom() { return tokenRoom; }
+    public long tokenRoom() { return (long) Integer.MAX_VALUE - TokenBank.getTokens(); }
     public long blueprints() { return blueprints; }
     public long weapons() { return weapons; }
     public long tokens() { return tokens; }
@@ -40,9 +40,7 @@ public final class PachinkoWinnings {
         return collected == null && (category == Category.TOKENS
                 || (category == Category.HULLMODS ? hullmodsLeft > 0 : weaponsAvailable));
     }
-    void purchased(int cost) { tokenRoom += cost; }
-
-    /** No game API calls, random item generation, or cargo access are allowed on this path. */
+    /** Item wins only reserve counts. Tokens are a cheap balance update, available immediately. */
     boolean reserve(Category category, int amount, int cost) {
         if (collected != null || amount <= 0 || !stockAvailable(category)) return false;
         if (category == Category.HULLMODS) {
@@ -51,25 +49,25 @@ public final class PachinkoWinnings {
             hullLots.add(new HullLot(amount, cost));
         } else if (category == Category.WEAPONS) {
             weapons += amount; weaponBetCosts += cost;
+            weaponLots.put(amount, weaponLots.getOrDefault(amount, 0L) + 1);
         } else {
-            if (tokenRoom < amount) return false;
-            tokens += amount; tokenRoom -= amount;
+            if (tokenRoom() < amount) return false;
+            tokens += TokenBank.addTokens(amount);
         }
         return true;
     }
 
     int refund(int cost) {
-        int held = (int) Math.min(cost, Math.max(0, tokenRoom));
-        refunds += held; tokenRoom -= held;
-        return held;
+        if (collected != null) return 0;
+        int paid = TokenBank.addTokens(cost);
+        refunds += paid;
+        return paid;
     }
 
     public String describe() {
         List<String> parts = new ArrayList<String>();
         if (blueprints > 0) parts.add(blueprints + " blueprints");
         if (weapons > 0) parts.add(weapons + " weapons");
-        if (tokens + refunds > 0) parts.add((tokens + refunds) + " tokens"
-                + (refunds > 0 ? " (" + refunds + " refunded)" : ""));
         return parts.isEmpty() ? "" : "To collect: " + String.join(", ", parts);
     }
 
@@ -101,9 +99,18 @@ public final class PachinkoWinnings {
             if (picker.isEmpty()) extraRefunds += weaponBetCosts;
             else {
                 Map<WeaponSpecAPI, Long> counts = new LinkedHashMap<WeaponSpecAPI, Long>();
-                for (long i = 0; i < weapons; i++) {
-                    WeaponSpecAPI spec = picker.pick();
-                    counts.put(spec, counts.getOrDefault(spec, 0L) + 1);
+                WeightedRandomPicker<WeaponSpecAPI> remainingPool = new WeightedRandomPicker<WeaponSpecAPI>(random);
+                for (Map.Entry<Integer, Long> lot : weaponLots.entrySet()) {
+                    for (long n = 0; n < lot.getValue(); n++) {
+                        remainingPool.clear();
+                        for (int i = 0; i < lot.getKey(); i++) {
+                            // A ball's reward draws without replacement. Very large rewards
+                            // refill only after every eligible type has appeared in that reward.
+                            if (remainingPool.isEmpty()) remainingPool.addAll(picker);
+                            WeaponSpecAPI spec = remainingPool.pickAndRemove();
+                            counts.put(spec, counts.getOrDefault(spec, 0L) + 1);
+                        }
+                    }
                 }
                 List<String> names = new ArrayList<String>();
                 for (Map.Entry<WeaponSpecAPI, Long> entry : counts.entrySet()) {
@@ -118,12 +125,14 @@ public final class PachinkoWinnings {
                 collected.lines.add(collected.weapons + " weapons: " + String.join(", ", names));
             }
         }
-        long owed = tokens + refunds + extraRefunds;
-        if (owed > 0) {
-            collected.tokens = TokenBank.addTokens((int) Math.min(Integer.MAX_VALUE, owed));
-            collected.refunds = Math.min(collected.tokens, refunds + extraRefunds);
-            collected.lines.add(collected.tokens + " tokens"
-                    + (collected.refunds > 0 ? " (includes " + collected.refunds + " refunded)" : ""));
+        collected.tokens = tokens + refunds;
+        collected.refunds = refunds;
+        if (tokens + refunds > 0) collected.lines.add((tokens + refunds) + " tokens paid during play"
+                + (refunds > 0 ? " (includes " + refunds + " refunded)" : ""));
+        if (extraRefunds > 0) {
+            int paid = TokenBank.addTokens((int) Math.min(Integer.MAX_VALUE, extraRefunds));
+            collected.tokens += paid; collected.refunds += paid;
+            collected.lines.add(paid + " tokens refunded for unavailable items at collection");
         }
         return collected;
     }

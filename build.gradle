@@ -93,6 +93,7 @@ tasks.register('prepareIcon') {
 def releaseFiles = copySpec {
     from(projectDir) {
         include 'mod_info.json', 'gambling_den.version', 'README.md', 'gambling-den-icon.png'
+        include 'THIRD_PARTY_NOTICES.txt'
         include 'data/**', 'graphics/**', 'jars/GamblingDen.jar'
     }
 }
