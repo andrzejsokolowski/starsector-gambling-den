@@ -37,7 +37,7 @@ public final class PachinkoRound {
     }
 
     public static Offer offer(Category category, PachinkoWinnings winnings) {
-        int[] amounts = PachinkoSettings.amounts();
+        int[] amounts = PachinkoSettings.amounts(category);
         String notice = "";
         if (category == Category.HULLMODS) {
             int available = winnings.hullmodsLeft();

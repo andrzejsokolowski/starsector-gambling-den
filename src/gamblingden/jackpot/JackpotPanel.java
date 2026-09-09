@@ -43,15 +43,13 @@ public final class JackpotPanel extends BaseCustomUIPanelPlugin {
         wasMouseDown=Mouse.isCreated() && Mouse.isButtonDown(0);
         bank=label("",Color.WHITE,0,18,1000,18,Fonts.DEFAULT_SMALL);
         label("RELIC JACKPOT",GOLD,0,107,1000,26,Fonts.ORBITRON_20AA);
-        label("3 MATCHING SYMBOLS  |  1 ITEM",DIM,0,145,1000,18,Fonts.DEFAULT_SMALL);
         label("Per reel",DIM,264,51,82,18,Fonts.DEFAULT_SMALL);
         for(int i=0;i<3;i++) button("stake:"+new int[]{2,4,8}[i],new int[]{2,4,8}[i]+" tokens",354+i*100,44,90,32);
         for(int i=0;i<3;i++) names[i]=label("",GOLD,163+i*228,443,218,48,Fonts.DEFAULT_SMALL);
         result=label("",Color.WHITE,40,504,920,34,Fonts.DEFAULT_SMALL);
         odds=label("",DIM,0,550,1000,18,Fonts.DEFAULT_SMALL);
-        button("pull","Pull",210,599,230,40);
-        button("skip","Skip",458,599,150,40);
-        button("leave","Leave",626,599,164,40);
+        button("pull","Pull",270,599,270,40);
+        button("leave","Leave",558,599,172,40);
         refreshPool(); refresh();
     }
     private LabelAPI label(String text,Color color,float x,float y,float w,float h,String font) {
@@ -77,10 +75,10 @@ public final class JackpotPanel extends BaseCustomUIPanelPlugin {
         for(Btn b:buttons) {
             b.checked=b.action.equals("stake:"+stake);
             b.enabled=b.action.startsWith("stake:")?!spinning:switch(b.action) {
-                case "pull" -> !spinning && !pool.isEmpty() && TokenBank.getTokens()>=JackpotGame.costOf(stake);
+                case "pull" -> spinning || !pool.isEmpty() && TokenBank.getTokens()>=JackpotGame.costOf(stake);
                 case "skip" -> spinning; default -> true;
             };
-            if(b.action.equals("pull")) b.label.setText("Pull - "+JackpotGame.costOf(stake)+" tokens");
+            if(b.action.equals("pull")) b.label.setText(spinning?"Skip":"Pull - "+JackpotGame.costOf(stake)+" tokens");
             b.label.setColor(b.enabled?Color.WHITE:DIM.darker());
         }
     }
@@ -88,6 +86,7 @@ public final class JackpotPanel extends BaseCustomUIPanelPlugin {
         if(dismissed) return;
         if(action.equals("leave")) { finishOnDismissal();if(callbacks!=null) callbacks.dismissDialog();return; }
         if(action.equals("skip")) { if(spinning) settle(); return; }
+        if(action.equals("pull") && spinning) { settle();return; }
         if(spinning) return;
         if(action.startsWith("stake:")) {
             int next=JackpotGame.clampStake(Integer.parseInt(action.substring(6)));

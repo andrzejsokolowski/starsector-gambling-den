@@ -46,19 +46,25 @@ final class BlackjackChecks {
     static void run() throws Exception {
         Bank b=new Bank(100); BlackjackGame g=game(b,1,9,13,7);
         check(g.deal(10) && b.balance==115 && g.paid()==25 && g.state()==State.RESULT,"Natural does not pay 3:2");
+        check(g.result().endsWith("Payout: 25 tokens"),"Natural result must show the payment including the stake");
         check(g.dealer().cards().size()==2,"Dealer drew against a natural");
         g.finish(); g.finish(); g.hit(); g.stand(); g.split(); g.doubleDown();
         check(b.balance==115 && b.payments==1 && g.rounds()==1,"Finished round paid twice");
         b=new Bank(100); g=game(b,1,13,10,1); g.deal(10);
         check(b.balance==100 && g.hands().get(0).outcome().equals("Push"),"Both naturals did not push");
+        check(g.result().equals("Push  |  Payout: 10 tokens"),"Push result payment unclear");
         b=new Bank(100); g=game(b,9,1,2,13); g.deal(10);
         check(g.state()==State.RESULT && !g.hit() && !g.doubleDown() && b.balance==90,"Dealer natural peek failed");
+        check(g.result().equals("Dealer blackjack  |  Payout: 0 tokens"),"Loss result implies another deduction");
+        b=new Bank(100); g=game(b,10,10,6,8); g.deal(10); g.finish();
+        check(g.result().equals("Loss  |  Payout: 0 tokens") && b.balance==90,"Ordinary loss text/accounting wrong");
         b=new Bank(100); g=game(b,10,1,7,6); g.deal(10); g.finish();
         check(g.dealer().cards().size()==2 && b.balance==100,"Dealer hit soft 17");
         b=new Bank(100); g=game(b,1,10,1,7,9); g.deal(10);
         check(g.hands().get(0).value()==12 && g.hands().get(0).soft(),"Multiple aces misvalued");
         g.hit(); g.finish();
         check(g.hands().get(0).value()==21 && !g.hands().get(0).natural() && b.balance==110,"Drawn 21 got natural bonus");
+        check(g.result().equals("Win  |  Payout: 20 tokens"),"Win result does not show actual payment");
         b=new Bank(100); g=game(b,10,6,9,10,5); g.deal(10); g.hit(); g.finish();
         check(b.balance==90 && g.hands().get(0).bust(),"Busted player won");
         b=new Bank(100); g=game(b,5,6,6,10,10,10); g.deal(10);
@@ -72,6 +78,7 @@ final class BlackjackChecks {
         b=new Bank(100); g=game(b,8,6,8,10,10,10,10); g.deal(10); g.split();
         check(!g.canSplit(),"Re-splitting allowed"); g.finish();
         check(b.balance==120 && g.paid()==40,"Two split wins paid incorrectly");
+        check(g.result().equals("Round complete  |  Payout: 40 tokens"),"Split result does not sum payments");
         b=new Bank(100); g=game(b,1,9,1,7,10,9,3); g.deal(10); g.split();
         check(g.state()==State.DEALER && !g.hit() && !g.canDouble(),"Split aces did not auto-stand"); g.finish();
         check(b.balance==120 && !g.hands().get(0).natural(),"Split ace 21 got natural bonus");
@@ -115,6 +122,8 @@ final class BlackjackChecks {
             }
             g.finish(); int paid=oracle(g);
             check(g.paid()==paid && b.balance==before-g.invested()+paid,"Independent blackjack oracle/accounting mismatch");
+            check(g.result().endsWith("Payout: "+paid+" tokens") && !g.result().contains("Returned")
+                    && !g.result().contains("-"),"Result displays a deduction instead of the payout");
             check(g.rounds()==round+1 && g.sessionNet()==b.balance-1000000,"Session totals wrong");
             for(Hand h:g.hands()) check(h.value()==value(h.cards()),"Hand value mismatch");
             int balance=b.balance; g.finish();

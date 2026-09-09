@@ -28,6 +28,7 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
     private static final Color BG = new Color(10, 15, 23), BOARD = new Color(18, 29, 40);
     private static final Color DIM = new Color(145, 160, 175), GOLD = new Color(255, 205, 105);
     private final Random random = new Random();
+    private final PachinkoBackdrop backdrop=new PachinkoBackdrop();
     private final List<Btn> buttons = new ArrayList<Btn>();
     private final List<LabelAPI> pocketLabels = new ArrayList<LabelAPI>();
     private final List<String> sessionLog = new ArrayList<String>();
@@ -62,6 +63,7 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
 
     public void init(CustomPanelAPI panel, DialogCallbacks callbacks) {
         this.panel = panel; this.callbacks = callbacks;
+        backdrop.init(PachinkoSettings.animeMode());
         winnings = new PachinkoWinnings();
         wasMouseDown = Mouse.isCreated() && Mouse.isButtonDown(0);
         label("PACHINKO", GOLD, 0, 18, PANEL_W, 25, Fonts.ORBITRON_20AA);
@@ -273,6 +275,8 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
             GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
             rect(0, 0, PANEL_W, PANEL_H, BG, alpha);
             rect(BOARD_X, BOARD_Y, PachinkoBoard.WIDTH, PachinkoBoard.HEIGHT, BOARD, alpha);
+            backdrop.draw(x(BOARD_X),y(BOARD_Y+PachinkoBoard.HEIGHT),PachinkoBoard.WIDTH,PachinkoBoard.HEIGHT,alpha);
+            if(backdrop.active()) rect(BOARD_X,BOARD_Y,PachinkoBoard.WIDTH,PachinkoBoard.HEIGHT,BOARD,alpha*.3f);
             GLDraw.frame(x(BOARD_X - 4), y(BOARD_Y + PachinkoBoard.HEIGHT + 4),
                     PachinkoBoard.WIDTH + 8, PachinkoBoard.HEIGHT + 8, category.color, 2, alpha * .65f);
             int landed = lastLanded == null ? -1 : lastLanded.getPocket();

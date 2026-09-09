@@ -104,7 +104,21 @@ public final class PachinkoPreview {
             blackjack(ui);return;
         }
         if(args.length>0 && args[0].equals("jackpot")) { jackpot(ui); return; }
+        boolean anime=args.length>0 && args[0].equals("anime");
+        if(anime) {
+            SettingsAPI base=Global.getSettings();
+            var images=new java.util.HashMap<String,com.fs.starfarer.api.graphics.SpriteAPI>();
+            Global.setSettings(proxy(new Class<?>[]{SettingsAPI.class},(p,m,a)->{
+                if(m.getName().equals("getSprite") && a[0].equals(PachinkoBackdrop.IMAGE))
+                    return images.computeIfAbsent((String)a[0],PachinkoPreview::sprite);
+                return m.invoke(base,a);
+            }));
+        }
         PachinkoPanel panel=new PachinkoPanel(); panel.init(ui,null);
+        if(anime) {
+            Field backdrop=PachinkoPanel.class.getDeclaredField("backdrop");backdrop.setAccessible(true);
+            ((PachinkoBackdrop)backdrop.get(panel)).init(true);
+        }
         Caption bounds=new Caption(); bounds.w=1000; bounds.h=660; panel.positionChanged(position(bounds));
         Pbuffer buffer=new Pbuffer(1000,660,new PixelFormat(),null);
         try {
@@ -198,7 +212,7 @@ public final class PachinkoPreview {
             case "setAlphaMult" -> { alpha[0]=(Float)a[0];yield null; }
             case "renderAtCenter" -> {
                 if(texture[0]==0) {
-                    BufferedImage art=ImageIO.read(new File(path.startsWith(gamblingden.blackjack.CardArt.ROOT)?path:
+                    BufferedImage art=ImageIO.read(new File(path.startsWith(gamblingden.blackjack.CardArt.ROOT) || path.equals(PachinkoBackdrop.IMAGE)?path:
                             "D:/Games/StarSector/starsector-core/graphics/icons/cargo/"+actual));
                     ByteBuffer pixels=BufferUtils.createByteBuffer(art.getWidth()*art.getHeight()*4);
                     for(int y=art.getHeight()-1;y>=0;y--) for(int x=0;x<art.getWidth();x++) {

@@ -86,7 +86,14 @@ final class FastRendererChecks {
             pachinkoAct.invoke(pachinko,"drop50");
             pachinkoAct.invoke(pachinko,"drop50");
             for(int frame=0;frame<600;frame++) {
-                if(frame==300) pachinkoAct.invoke(pachinko,"skip");
+                if(frame==300) {
+                    pachinkoAct.invoke(pachinko,"skip");
+                    Field backdrop=pachinkoType.getDeclaredField("backdrop");backdrop.setAccessible(true);
+                    Object artwork=backdrop.get(pachinko);
+                    artwork.getClass().getMethod("init",boolean.class).invoke(artwork,true);
+                    if(!(Boolean)artwork.getClass().getMethod("active").invoke(artwork))
+                        throw new AssertionError("FR anime-background test did not enable the artwork");
+                }
                 pachinko.advance(1f/60);
                 boolean clipped=frame%2==0;
                 enqueue.invoke(exec,(Runnable)()->{

@@ -1,28 +1,29 @@
 {
-  # Each reel independently shows an item 85% of the time, otherwise a blank.
-  # Only three copies of the exact same item pay. One item per match.
-  "symbolChance": 0.85,
-  # minStake is tokens PER REEL: 2, 4, or 8. Three reels are always paid.
-  # Add installed special-item IDs here. Optional data supports parameterized items.
-  # Mission/no-drop/restricted items and missing mods are excluded.
-  # Commodities are limited to AI cores; their minimum stakes cannot be lowered.
+  # Match rates are independent of reward-list size. LunaLib sliders override these defaults.
+  "matchChance": {"2":0.15, "4":0.20, "8":0.25},
+  # Visual item/blank frequency on losing spins only. This cannot create extra wins.
+  "lossSymbolChance": 0.85,
+  # Each item belongs to exactly one tier: 2, 4, or 8 tokens PER REEL.
+  # A pull still costs three reels. Winners receive one item from the selected tier.
+  # Optional data supports parameterized special items. Missing/mission/restricted/no-drop items are excluded.
+  # Commodity entries only support AI cores, each fixed to its own tier.
   "rewards": [
-    {"kind":"commodity", "id":"gamma_core", "minStake":2, "weight":1},
-    {"kind":"commodity", "id":"beta_core", "minStake":4, "weight":0.8},
-    {"kind":"commodity", "id":"alpha_core", "minStake":8, "weight":0.5},
-    {"id":"corrupted_nanoforge", "minStake":2, "weight":1},
-    {"id":"soil_nanites", "minStake":2, "weight":1},
-    {"id":"drone_replicator", "minStake":2, "weight":1},
-    {"id":"plasma_dynamo", "minStake":2, "weight":1},
-    {"id":"catalytic_core", "minStake":2, "weight":1},
-    {"id":"mantle_bore", "minStake":4, "weight":1},
-    {"id":"biofactory_embryo", "minStake":4, "weight":1},
-    {"id":"fullerene_spool", "minStake":4, "weight":1},
-    {"id":"dealmaker_holosuite", "minStake":4, "weight":1},
-    {"id":"orbital_fusion_lamp", "minStake":4, "weight":1},
-    {"id":"pristine_nanoforge", "minStake":8, "weight":0.6},
-    {"id":"synchrotron", "minStake":8, "weight":0.8},
-    {"id":"cryoarithmetic_engine", "minStake":8, "weight":0.8},
-    {"id":"coronal_portal", "minStake":8, "weight":0.6}
+    {"kind":"commodity", "id":"gamma_core", "tier":2, "weight":1},
+    {"kind":"commodity", "id":"beta_core", "tier":4, "weight":0.8},
+    {"kind":"commodity", "id":"alpha_core", "tier":8, "weight":0.5},
+    {"id":"corrupted_nanoforge", "tier":2, "weight":1},
+    {"id":"soil_nanites", "tier":2, "weight":1},
+    {"id":"drone_replicator", "tier":2, "weight":1},
+    {"id":"plasma_dynamo", "tier":2, "weight":1},
+    {"id":"catalytic_core", "tier":2, "weight":1},
+    {"id":"mantle_bore", "tier":4, "weight":1},
+    {"id":"biofactory_embryo", "tier":4, "weight":1},
+    {"id":"fullerene_spool", "tier":4, "weight":1},
+    {"id":"dealmaker_holosuite", "tier":4, "weight":1},
+    {"id":"orbital_fusion_lamp", "tier":4, "weight":1},
+    {"id":"pristine_nanoforge", "tier":8, "weight":0.6},
+    {"id":"synchrotron", "tier":8, "weight":0.8},
+    {"id":"cryoarithmetic_engine", "tier":8, "weight":0.8},
+    {"id":"coronal_portal", "tier":8, "weight":0.6}
   ]
 }

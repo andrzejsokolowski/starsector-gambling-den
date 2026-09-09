@@ -60,17 +60,21 @@ Every action has a button. Space pulls and Escape leaves, but neither is the onl
 
 Choose **Hullmods**, **Weapons**, or **Tokens**, then drop **1, 10 or 50 balls**. Keep buying
 balls while earlier ones are falling. Each button shows the full cost of its batch; purchases
-are all-or-nothing. Default prices per ball are 4 tokens for hullmods, 2 for weapons, and 2
+are all-or-nothing. Default prices per ball are 4 tokens for hullmods, 2 for weapons, and 1
 for tokens. Balls feed rapidly from the centre, bouncing off ten rows of pegs and each other.
 The board allows up to 100 falling or queued balls at once. Landed balls free room for more.
 
-The pocket amounts, from left to right, are:
+Weapon and token pocket amounts, from left to right, are:
 
 `16 | 8 | 4 | 2 | 1 | 0 | 1 | 2 | 4 | 8 | 16`
 
-These are direct quantities. An 8 on the hullmod board gives eight random blueprint chips,
-not eight boxes and not a second roll for a prize. The centre pays nothing; the outer pockets
-are the rare large wins. Each landing adds item rewards to the pending winnings total.
+Hullmod pocket amounts are:
+
+`1 | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1`
+
+Each outer pocket pays one random blueprint; the middle five pay nothing.
+These are direct quantities, not boxes or a second roll for a prize.
+Each landing adds item rewards to the pending winnings total.
 The game generates and transfers items when you leave the Pachinko screen.
 Pending items remain across batches and category changes. Token wins and refunds pay on landing,
 so you can immediately use them to buy more balls.
@@ -129,6 +133,10 @@ Winnings enter the token balance when the round ends. During a round, the exit b
 Stand & leave. That button, Escape, and an external closure stand on unfinished hands and resolve
 the dealer once. Leaving cannot cancel a paid bet or collect it twice.
 
+The result line shows the actual payout, not a second deduction or the net result.
+For a 200-token bet, a loss shows Payout: 0 tokens, a push shows 200, and an ordinary win shows 400.
+The bet was already paid on Deal.
+
 ## Relic Jackpot
 
 This separate machine always has three reels. Stakes are 2, 4, or 8 tokens per reel,
@@ -136,17 +144,22 @@ so a pull costs 6, 12, or 24 tokens. Three copies of the same item on the middle
 award exactly one item. Blanks and mismatches pay nothing. There are no refunds, pity wins,
 consolation credits, or doubling. Closing or skipping finishes the paid spin and collects its result once.
 
-Gamma cores enter at 2 tokens per reel, beta cores at 4, and alpha cores at 8.
-Higher stakes keep earlier rewards and add more colony items.
-The default list contains fourteen colony items and three AI core grades.
-Mission items are not included. Each reel rolls independently.
-The default chance of any match is about 1.71% / 0.43% / 0.23%.
-Higher stakes unlock rarer items, not a higher win rate. The screen shows the current match chance.
+Each stake has its own reward pool. The 2-token tier includes gamma cores and lower-tier colony items;
+4 tokens gives beta cores and mid-tier items; 8 tokens gives alpha cores and the top-tier items.
+The default list contains fourteen colony items and three AI core grades, split across those tiers.
+Higher stakes do not retain rewards from lower tiers.
 
-Edit `data/config/jackpot_rewards.json` to change the dedicated reward list, item weights, minimum stakes, and blank chance.
+The default match chances per pull are 15% / 20% / 25% at 2 / 4 / 8 tokens per reel.
+The chance is set directly and does not shrink when more items enter a pool.
+The screen shows the current match chance, and LunaLib has a separate slider for each tier.
+Pull becomes Skip during a spin. Clicking it finishes that paid spin without another charge.
+
+Edit `data/config/jackpot_rewards.json` to change the dedicated reward list, item weights, tiers, and default match chances.
+`lossSymbolChance` only controls how often an item rather than a blank appears on a losing spin.
+LunaLib match-chance sliders take precedence over the JSON defaults.
 Use special-item IDs from the installed game or mods. Optional `data` identifies a parameterized special item.
 Missing, mission, restricted, and no-drop items are skipped. Only AI cores can use the commodity entry type.
-The core stake gates still apply if the list gives a lower minimum.
+AI cores always stay in their own tier, even if the list assigns a different one.
 Reload a save after edits. Empty lists disable purchases.
 
 ## Tuning
@@ -162,10 +175,15 @@ are in each size of hull mod box, how many weapons in each size of crate (1 to 1
 what the cash and token symbols pay at each stake, the chance a reel pays anything at all, and
 what the keeper gives per fleet point of hull.
 
-The **Pachinko** tab has separate ball-price sliders for each category and six pocket-amount
-sliders (0–100). Each amount applies symmetrically at the same distance from the centre.
+The **Pachinko** tab has separate ball-price sliders for each category, six weapon/token pocket
+sliders, and six separate hullmod pocket sliders (0–100). Each amount applies symmetrically
+at the same distance from the centre. Saved weapon/token pocket settings do not change hullmod pockets.
 They do not use the Slots crate-size sliders. A purchased ball keeps its quoted price and
 pocket amounts if settings change during its fall.
+
+Anime mode, in the same tab, adds an optional illustrated background. It is off by default.
+Reopen the Pachinko screen after switching it. It changes no costs, odds, or ball physics.
+The token-ball price now uses a new setting so the previous saved 2-token default becomes 1.
 
 **`data/config/gambling_den.json`** holds the deeper wiring — reel costs, the reel strip weights
 for all four stakes, the payout variance and the double-or-nothing chance. Edit and reload a
@@ -190,6 +208,21 @@ with both icon sizes into `GamblingDen.zip`.
 If `fr.jar` is installed in `starsector-core`, the checks also send 2,400 panel frames through
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
+
+## Changes in 1.4.0
+
+Relic Jackpot has separate item tiers and much higher match chances: 15%, 20%, and 25%.
+LunaLib has per-tier chance sliders. The extra three-match explanation is removed.
+Pull changes to Skip while spinning, with no second charge.
+
+Pachinko token balls cost 1 token by default. Hullmod pockets now pay one blueprint in the
+outer three pockets on each side, and nothing in the middle five. Hullmod pocket sliders are separate.
+Optional Anime mode adds an original background without changing gameplay.
+
+Blackjack results show only the actual payout; losses no longer look like a second deduction.
+Checks cover the new odds, tiered rewards, one-item pools, zero/100% settings, mouse actions,
+exact payouts, background loading, unchanged ball outcomes, and Fast Rendering.
+The updated screens were checked with offscreen previews; live-game testing is still needed.
 
 ## Changes in 1.3.1
 

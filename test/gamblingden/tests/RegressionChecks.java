@@ -196,7 +196,8 @@ public class RegressionChecks {
             case "getAllBarEventSpecs" -> new ArrayList<>();
             case "getHullModSpec" -> hullmods.stream().filter(s->s.getId().equals(a[0])).findFirst().orElse(null);
             case "getScreenScaleMult" -> 1f;
-            case "getSprite" -> recordIcons || ((String)a[0]).startsWith(gamblingden.blackjack.CardArt.ROOT) ? sprite((String)a[0]) : null;
+            case "getSprite" -> recordIcons || ((String)a[0]).startsWith(gamblingden.blackjack.CardArt.ROOT)
+                    || a[0].equals(gamblingden.pachinko.PachinkoBackdrop.IMAGE) ? sprite((String)a[0]) : null;
             case "loadTexture" -> { if(((String)a[0]).startsWith(gamblingden.blackjack.CardArt.ROOT)) cardLoads++;yield null; }
             case "createLabel" -> { labelCaptions.add((String)a[0]); yield label(); }
             default -> null;
@@ -541,7 +542,8 @@ public class RegressionChecks {
                     for (int i = 0; i < 40; i++) hullmods.add(hullmod("pachinko_" + i, 1));
                     weapons.add(weapon("test_gun", 1, false));
                     var offer = gamblingden.pachinko.PachinkoRound.offer(category);
-                    int[] expected = {16,8,4,2,1,0,1,2,4,8,16};
+                    int[] expected = category.name().equals("HULLMODS")
+                            ? new int[]{1,1,1,0,0,0,0,0,1,1,1} : new int[]{16,8,4,2,1,0,1,2,4,8,16};
                     for (int i=0;i<11;i++) check(offer.amount(i)==expected[i], "Wrong pachinko pocket layout");
                     var round = gamblingden.pachinko.PachinkoRound.buy(offer, new Random(seed * 7919L));
                     check(round != null && TokenBank.getTokens()==1000-offer.cost, "Ball not charged exactly once");
@@ -564,7 +566,7 @@ public class RegressionChecks {
 
         reset(); hullmods.add(hullmod("last",1)); TokenBank.addTokens(100);
         var cap = gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS);
-        check(cap.maximum()==1 && !cap.notice.isEmpty(), "Hullmod shortage was not visible before buying");
+        check(cap.maximum()==1 && cap.canBuy(), "One remaining hullmod must still cover a winning pocket");
         known.add("last");
         check(gamblingden.pachinko.PachinkoRound.buy(cap,new Random(3))==null && TokenBank.getTokens()==100, "Stale quote charged tokens");
         var empty = gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS);
@@ -583,9 +585,9 @@ public class RegressionChecks {
             invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{600f,85f,false});
             invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{140f,623f,true});
             var round=(gamblingden.pachinko.PachinkoRound)get(panel,"round");
-            check(round!=null && TokenBank.getTokens()==98,"Pachinko mouse Drop does not work");
+            check(round!=null && TokenBank.getTokens()==99,"Pachinko mouse Drop does not work");
             invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{140f,623f,true});
-            check(get(panel,"round")==round && TokenBank.getTokens()==98,"Held mouse bought extra balls");
+            check(get(panel,"round")==round && TokenBank.getTokens()==99,"Held mouse bought extra balls");
             invoke(panel,"act",String.class,"category:WEAPONS");
             check(get(panel,"category")==gamblingden.pachinko.PachinkoSettings.Category.TOKENS,"Category changed mid-flight");
             round.board.finish();
@@ -599,7 +601,7 @@ public class RegressionChecks {
                 check(calls[0]==1,"Pachinko close callback repeated");
             }
             panel.finishOnDismissal(); invoke(panel,"act",String.class,"drop"); invoke(panel,"act",String.class,"skip");
-            check(TokenBank.getTokens()==98+amount && round.isSettled(),"Closing lost/repeated paid ball");
+            check(TokenBank.getTokens()==99+amount && round.isSettled(),"Closing lost/repeated paid ball");
             check(((LabelAPI)get(panel,"result")).getText().equals(round.getResult()),"Panel result does not match actual receipt");
         }
         reset(); TokenBank.addTokens(100);
@@ -642,12 +644,19 @@ public class RegressionChecks {
             String[] columns=line.split(",",-1);
             check(columns.length==9,"Malformed pachinko Luna settings row");
             if(columns[2].equals("Int")) settings.put(columns[0],Integer.parseInt(columns[3]));
+            if(columns[2].equals("Boolean")) settings.put(columns[0],Boolean.parseBoolean(columns[3]));
         }
         try {
             loader.setHasLoaded(true);
             lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
+            settings.put("gd_pachinko_cost_tokens",2); // Old saved default must not keep charging two.
+            check(gamblingden.pachinko.PachinkoSettings.cost(gamblingden.pachinko.PachinkoSettings.Category.TOKENS)==1,
+                    "Old token-ball setting overrode the new one-token default");
+            check(!gamblingden.pachinko.PachinkoSettings.animeMode(),"Anime mode should default off");
             reset(); TokenBank.addTokens(2000); weapons.add(weapon("custom_gun",1,false));
             for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,100);
+            check(Arrays.equals(gamblingden.pachinko.PachinkoSettings.amounts(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS),
+                    new int[]{1,1,1,0,0,0,0,0,1,1,1}),"Shared pocket sliders changed hullmod payouts");
             settings.put("gd_pachinko_cost_weapons",7);
             var offer=gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.WEAPONS);
             check(offer.maximum()==100 && offer.cost==7,"Luna custom values ignored");
@@ -674,7 +683,7 @@ public class RegressionChecks {
             check(TokenBank.getTokens()==Integer.MAX_VALUE-capped.cost+capped.amount(limit.board.getPocket()),"Token cap mismatch");
 
             reset(); TokenBank.addTokens(100); hullmods.add(hullmod("disappears",1));
-            for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,1);
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_hullmod_pocket_"+i,1);
             var disappearing=gamblingden.pachinko.PachinkoRound.buy(
                     gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS),new Random(7));
             known.add("disappears"); disappearing.finish(); disappearing.finish();
@@ -710,14 +719,72 @@ public class RegressionChecks {
         }
     }
 
+    private static void pachinkoBackground() throws Exception {
+        var loader=lunalib.backend.ui.settings.LunaSettingsLoader.INSTANCE;
+        boolean loaded=loader.getHasLoaded();var previous=lunalib.backend.ui.settings.LunaSettingsLoader.getSettings();
+        var settings=new org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject("unused-test-settings");
+        SettingsAPI original=Global.getSettings();
+        for(String line:java.nio.file.Files.readAllLines(java.nio.file.Path.of("data/config/LunaSettings.csv"))) {
+            String[] columns=line.split(",",-1);
+            if(line.startsWith("gd_pachinko_") && columns[2].equals("Int")) settings.put(columns[0],Integer.parseInt(columns[3]));
+        }
+        int[] loads={0};boolean[] rendering={false};
+        Pbuffer buffer=new Pbuffer(1200,800,new PixelFormat(),null);
+        try {
+            loader.setHasLoaded(true);
+            lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
+            Global.setSettings(proxy(SettingsAPI.class,(m,a)->{
+                if(m.getName().equals("loadTexture") && a[0].equals(gamblingden.pachinko.PachinkoBackdrop.IMAGE)) {
+                    check(!rendering[0],"Background loaded on the rendering path");loads[0]++;
+                }
+                return m.invoke(original,a);
+            }));
+            buffer.makeCurrent();
+            String baseline=null;
+            for(boolean enabled:new boolean[]{false,true}) {
+                reset();recordIcons=true;TokenBank.addTokens(100);
+                settings.put("gd_pachinko_anime_mode",enabled);
+                var panel=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+                var art=(gamblingden.pachinko.PachinkoBackdrop)get(panel,"backdrop");
+                check(art.active()==enabled && loads[0]==(enabled?1:0),"Anime setting not respected at opening");
+                ((Random)get(panel,"random")).setSeed(872);
+                invoke(panel,"act",String.class,"category:TOKENS");
+                invoke(panel,"act",String.class,"drop50");
+                for(int frame=0;frame<200;frame++) {
+                    panel.advance(1f/60);rendering[0]=true;panel.renderBelow(.7f);rendering[0]=false;
+                }
+                invoke(panel,"act",String.class,"skip");
+                String outcome=TokenBank.getTokens()+":"+((LabelAPI)get(panel,"result")).getText();
+                if(baseline==null) baseline=outcome;
+                else check(outcome.equals(baseline),"Anime mode changed ball results or accounting");
+                long draws=drawnIcons.stream().filter(i->i.path().equals(gamblingden.pachinko.PachinkoBackdrop.IMAGE)).count();
+                check(draws==(enabled?200:0) && loads[0]==(enabled?1:0),"Background redrawn/loaded incorrectly");
+                panel.finishOnDismissal();
+            }
+            Global.setSettings(proxy(SettingsAPI.class,(m,a)->{
+                if(m.getName().equals("getSprite") && a[0].equals(gamblingden.pachinko.PachinkoBackdrop.IMAGE)) return null;
+                return m.invoke(original,a);
+            }));
+            var missing=new gamblingden.pachinko.PachinkoBackdrop();missing.init(true);
+            check(!missing.active(),"Missing background failed to fall back");
+            var image=javax.imageio.ImageIO.read(new java.io.File(gamblingden.pachinko.PachinkoBackdrop.IMAGE));
+            check(image!=null && image.getWidth()>1000 && image.getHeight()>600,"Packaged background missing/too small");
+            System.out.println("PASS: optional Pachinko background, load timing, fallback, and identical 50-ball outcomes.");
+        } finally {
+            rendering[0]=false;recordIcons=false;buffer.destroy();Global.setSettings(original);
+            lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous);loader.setHasLoaded(loaded);
+        }
+    }
+
     private static void pachinkoDeferred(org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject settings) throws Exception {
         reset(); TokenBank.addTokens(100000);
         for(int i=0;i<3;i++) hullmods.add(hullmod("held_"+i,1));
         weapons.add(weapon("pooled_gun",1,false));
         settings.put("gd_pachinko_cost_hullmods",4);
         settings.put("gd_pachinko_cost_weapons",7);
-        settings.put("gd_pachinko_cost_tokens",2);
+        settings.put("gd_pachinko_token_price",2);
         for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,2);
+        for(int i=0;i<6;i++) settings.put("gd_pachinko_hullmod_pocket_"+i,2);
         var panel=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
         var held=(gamblingden.pachinko.PachinkoWinnings)get(panel,"winnings");
         try {
@@ -904,22 +971,22 @@ public class RegressionChecks {
         invoke(panel,"act",String.class,"category:TOKENS");
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{540f,623f,true});
         var live=(List<gamblingden.pachinko.PachinkoRound>)get(panel,"rounds");
-        check(live.size()==50 && TokenBank.getTokens()==1900,"50-ball button cost/quantity mismatch");
+        check(live.size()==50 && TokenBank.getTokens()==1950,"50-ball button cost/quantity mismatch");
         panel.advance(.2f);
         var swarm=(gamblingden.pachinko.PachinkoSwarm)get(panel,"swarm");
         check(swarm.launched()>1 && swarm.pending()>1,"Balls still run one at a time");
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,623f,false});
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,623f,true});
-        check(live.size()==60 && TokenBank.getTokens()==1880,"Cannot add paid balls during a run");
+        check(live.size()==60 && TokenBank.getTokens()==1940,"Cannot add paid balls during a run");
         panel.processInput(List.of(key(Keyboard.KEY_SPACE)));
-        check(live.size()==61 && TokenBank.getTokens()==1878,"Space still skips instead of adding a ball");
+        check(live.size()==61 && TokenBank.getTokens()==1939,"Space still skips instead of adding a ball");
         invoke(panel,"act",String.class,"drop50");
-        check(live.size()==61 && TokenBank.getTokens()==1878,"Over-cap batch partially charged");
+        check(live.size()==61 && TokenBank.getTokens()==1939,"Over-cap batch partially charged");
         var all=new ArrayList<>(live);
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{725f,623f,false});
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{725f,623f,true});
         int winnings=all.stream().mapToInt(gamblingden.pachinko.PachinkoRound::getAwarded).sum();
-        check(TokenBank.getTokens()==1878+winnings && ((gamblingden.pachinko.PachinkoWinnings)get(panel,"winnings")).tokens()==winnings
+        check(TokenBank.getTokens()==1939+winnings && ((gamblingden.pachinko.PachinkoWinnings)get(panel,"winnings")).tokens()==winnings
                 && all.stream().allMatch(gamblingden.pachinko.PachinkoRound::isSettled),"Finish all lost/paid pending batch winnings");
         check(live.isEmpty() && swarm.balls().isEmpty(),"Completed physics bodies retained during continuous play");
         check(((LabelAPI)get(panel,"result")).getText().contains(winnings+" tokens")
@@ -939,13 +1006,13 @@ public class RegressionChecks {
             if(exit.equals("external")) new gamblingden.pachinko.PachinkoDialogDelegate(game,()->{}).reportDismissed(0);
             game.finishOnDismissal();
             int paid=balls.stream().mapToInt(gamblingden.pachinko.PachinkoRound::getAwarded).sum();
-            check(balls.stream().allMatch(gamblingden.pachinko.PachinkoRound::isSettled) && TokenBank.getTokens()==900+paid,"Lost queued ball on "+exit);
+            check(balls.stream().allMatch(gamblingden.pachinko.PachinkoRound::isSettled) && TokenBank.getTokens()==950+paid,"Lost queued ball on "+exit);
         }
 
-        reset(); TokenBank.addTokens(99);
+        reset(); TokenBank.addTokens(49);
         var unaffordable=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
         invoke(unaffordable,"act",String.class,"category:TOKENS"); invoke(unaffordable,"act",String.class,"drop50");
-        check(TokenBank.getTokens()==99 && ((List<?>)get(unaffordable,"rounds")).isEmpty(),"Unaffordable batch spent some tokens");
+        check(TokenBank.getTokens()==49 && ((List<?>)get(unaffordable,"rounds")).isEmpty(),"Unaffordable batch spent some tokens");
 
         // Stock exhaustion and settlement order must match across frame rates and Finish all.
         for(var category:gamblingden.pachinko.PachinkoSettings.Category.values()) {
@@ -1126,16 +1193,17 @@ public class RegressionChecks {
             }));
         }
         gamblingden.jackpot.JackpotGame.clearCache();
-        check(gamblingden.jackpot.JackpotGame.pool(8).size()==17,"Default jackpot list missing items");
+        check(gamblingden.jackpot.JackpotGame.pool(2).size()==6 && gamblingden.jackpot.JackpotGame.pool(4).size()==6
+                && gamblingden.jackpot.JackpotGame.pool(8).size()==5,"Default jackpot tiers missing items");
     }
     private static void jackpot() throws Exception {
         reset();jackpotDefaults();
         for(int stake:new int[]{2,4,8}) {
             var pool=gamblingden.jackpot.JackpotGame.pool(stake);
-            check(pool.stream().anyMatch(r->r.id().equals("gamma_core")),"Gamma core missing");
-            check(pool.stream().anyMatch(r->r.id().equals("beta_core"))==(stake>=4),"Beta stake gate");
-            check(pool.stream().anyMatch(r->r.id().equals("alpha_core"))==(stake>=8),"Alpha stake gate");
-            check(pool.stream().allMatch(r->r.minStake()<=stake),"Locked item in jackpot pool");
+            check(pool.stream().anyMatch(r->r.id().equals("gamma_core"))==(stake==2),"Gamma tier");
+            check(pool.stream().anyMatch(r->r.id().equals("beta_core"))==(stake==4),"Beta tier");
+            check(pool.stream().anyMatch(r->r.id().equals("alpha_core"))==(stake==8),"Alpha tier");
+            check(pool.stream().allMatch(r->r.tier()==stake),"Item from another tier in jackpot pool");
             saved.put(Ids.KEY_TOKENS,10000000);
             int wins=0,draws=100000;Random random=new Random(stake);
             for(int spin=0;spin<draws;spin++) {
@@ -1151,19 +1219,20 @@ public class RegressionChecks {
                 if(match) { wins++;check(result.equals("Collected: 1 "+first.name()+"."),"Jackpot receipt differs from symbol"); }
             }
             double expected=gamblingden.jackpot.JackpotGame.matchChance(stake);
-            check(Math.abs((double)wins/draws-expected)<.001,"Independent match odds differ from display");
+            check(expected==(stake==2?.15:stake==4?.20:.25),"Wrong new default match chance");
+            check(Math.abs((double)wins/draws-expected)<.005,"Match odds differ from display");
             check(TokenBank.getTokens()==10000000-draws*stake*3,"Jackpot charged wrong cost");
             System.out.printf("Relic Jackpot: %d per reel, %.3f%% expected, %.3f%% observed%n",stake,100*expected,100d*wins/draws);
         }
         saved.put(Ids.KEY_TOKENS,5);
         check(gamblingden.jackpot.JackpotGame.buy(2,new Random())==null && TokenBank.getTokens()==5,"Unaffordable jackpot charged");
         specialSpecs.put("mission_reward",proxy(SpecialItemSpecAPI.class,(m,a)->m.getName().equals("hasTag") && a[0].equals("mission_item")));
-        var custom=new org.json.JSONObject("{'symbolChance':1,'rewards':[{'id':'missing'},{'id':'soil_nanites'},"
+        var custom=new org.json.JSONObject("{'symbolChance':1,'matchChance':{'2':1},'rewards':[{'id':'missing'},{'id':'soil_nanites'},"
                 +"{'id':'mission_reward'},{'id':'soil_nanites'},{'kind':'commodity','id':'alpha_core','minStake':2},{'kind':'commodity','id':'fuel'}]}");
         Method load=gamblingden.jackpot.JackpotGame.class.getDeclaredMethod("load",org.json.JSONObject.class);load.setAccessible(true);load.invoke(null,custom);
-        check(gamblingden.jackpot.JackpotGame.pool(2).size()==1 && gamblingden.jackpot.JackpotGame.pool(8).size()==2,
+        check(gamblingden.jackpot.JackpotGame.pool(2).size()==1 && gamblingden.jackpot.JackpotGame.pool(8).size()==1,
                 "Missing/duplicate/ordinary item or unlocked alpha entered custom list");
-        for(String close:List.of("skip","leave","escape","external","animated")) {
+        for(String close:List.of("skip","pull","leave","escape","external","animated")) {
             reset();recordIcons=true;TokenBank.addTokens(100);
             var panel=(gamblingden.jackpot.JackpotPanel)machine(gamblingden.jackpot.JackpotPanel.class);
             invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,620f,true});
@@ -1171,7 +1240,15 @@ public class RegressionChecks {
             invoke(panel,"act",String.class,"stake:8");check((Integer)get(panel,"stake")==2,"Jackpot stake changed mid-spin");
             invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,620f,true});
             check(TokenBank.getTokens()==94,"Held mouse bought two pulls");
-            if(close.equals("skip")) {
+            check(!labelCaptions.contains("3 MATCHING SYMBOLS  |  1 ITEM"),"Unwanted jackpot tutorial text remains");
+            Object pull=((List<?>)get(panel,"buttons")).stream().filter(b->{try{return get(b,"action").equals("pull");}catch(Exception e){throw new RuntimeException(e);}}).findFirst().orElseThrow();
+            check((Boolean)get(pull,"enabled") && ((LabelAPI)get(pull,"label")).getText().equals("Skip"),"Pull did not become an enabled Skip");
+            if(close.equals("pull")) {
+                invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,620f,false});
+                invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,620f,true});
+                check(TokenBank.getTokens()==94,"Skipping with Pull charged a second bet");
+                check(((LabelAPI)get(pull,"label")).getText().startsWith("Pull"),"Main button did not return to Pull");
+            } else if(close.equals("skip")) {
                 invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{510f,620f,false});
                 invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{510f,620f,true});
             } else if(close.equals("leave")) {
@@ -1199,6 +1276,37 @@ public class RegressionChecks {
             }
             panel.finishOnDismissal();check(specialItems.get("soil_nanites")==1,"Jackpot exit paid twice");
         }
+        // A one-item pool must still obey explicit rates, including guaranteed losses.
+        var loader=lunalib.backend.ui.settings.LunaSettingsLoader.INSTANCE;
+        boolean loaded=loader.getHasLoaded();var previous=lunalib.backend.ui.settings.LunaSettingsLoader.getSettings();
+        var settings=new org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject("unused-test-settings");
+        try {
+            loader.setHasLoaded(true);
+            lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
+            for(int percent:new int[]{-20,0,37,100,120}) {
+                settings.put("gd_jackpot_match_2",percent);
+                double expected=Math.max(0,Math.min(100,percent))/100d;
+                check(gamblingden.jackpot.JackpotGame.matchChance(2)==expected,"Luna jackpot rate ignored/unbounded");
+                saved.put(Ids.KEY_TOKENS,1000000);
+                int wins=0;Random random=new Random(931);
+                for(int spin=0;spin<10000;spin++) {
+                    var round=gamblingden.jackpot.JackpotGame.buy(2,random);
+                    if(round.winner()!=null) wins++;
+                    if(expected==0) check(round.symbols.stream().anyMatch(Objects::isNull),"Loss with one item displayed a triple");
+                }
+                check(Math.abs(wins/10000d-expected)<.02,"One-item pool changed configured probability");
+            }
+        } finally { lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous);loader.setHasLoaded(loaded); }
+        reset();TokenBank.addTokens(6);
+        var broke=(gamblingden.jackpot.JackpotPanel)machine(gamblingden.jackpot.JackpotPanel.class);
+        invoke(broke,"act",String.class,"pull");
+        check(TokenBank.getTokens()==0 && (Boolean)get(broke,"spinning"),"Last affordable pull failed");
+        Object skip=((List<?>)get(broke,"buttons")).stream().filter(b->{try{return get(b,"action").equals("pull");}catch(Exception e){throw new RuntimeException(e);}}).findFirst().orElseThrow();
+        check((Boolean)get(skip,"enabled"),"Zero balance disabled Skip for an already-paid spin");
+        invoke(broke,"act",String.class,"pull");
+        check(!(Boolean)get(broke,"spinning") && TokenBank.getTokens()==0 && specialItems.get("soil_nanites")==1,"Last-token Skip failed");
+        invoke(broke,"act",String.class,"pull");broke.finishOnDismissal();
+        check(specialItems.get("soil_nanites")==1,"Repeated broke Pull paid twice");
         load.invoke(null,new org.json.JSONObject("{'rewards':[]}"));
         check(gamblingden.jackpot.JackpotGame.buy(2,new Random())==null,"Empty jackpot pool accepted payment");
         jackpotDefaults();recordIcons=false;
@@ -1210,7 +1318,7 @@ public class RegressionChecks {
         }
         setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
         PachinkoPhysicsChecks.run(); PachinkoPhysicsChecks.multiBall(); pachinko(); pachinkoSettings(); pachinkoBatches();
-        BlackjackChecks.run(); blackjackUI(); blackjackCardArt(); expandedRewards(); jackpot();
+        pachinkoBackground(); BlackjackChecks.run(); blackjackUI(); blackjackCardArt(); expandedRewards(); jackpot();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }

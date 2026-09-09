@@ -186,8 +186,7 @@ public final class BlackjackGame {
     }
     public String result() {
         if (state != State.RESULT) return "";
-        int net = paid - invested;
         String outcome = hands.size() == 1 ? hands.get(0).outcome : "Round complete";
-        return outcome + "  |  " + (net > 0 ? "+" : "") + net + " tokens  |  Returned " + paid;
+        return outcome + "  |  Payout: " + paid + (paid==1?" token":" tokens");
     }
 }
