@@ -77,6 +77,15 @@ If `fr.jar` is installed in `starsector-core`, the checks also send 600 panel fr
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
 
+## Changes in 0.4.4
+
+Changing the stakes or reel count now clears the previous reward text, reel labels and win
+effects. Clicking the current setting leaves the result untouched. Stopped reels outline the
+middle row and dim the neighbouring symbols. No odds or rewards have changed.
+
+Regression checks now compare the drawn middle-row icons, labels, reward text and cargo
+for every prize type, one to five reels, and normal and skipped spins.
+
 ## Changes in 0.4.3
 
 Fixes the fatal "Asynchronous pipeline stall" introduced in 0.4.2 when using Fast Rendering.

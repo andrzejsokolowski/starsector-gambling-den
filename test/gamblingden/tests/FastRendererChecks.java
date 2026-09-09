@@ -8,6 +8,8 @@ import java.util.concurrent.ExecutorService;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.*;
 import com.fs.starfarer.api.campaign.BaseCustomUIPanelPlugin;
+import gamblingden.prizes.Prize;
+import gamblingden.slots.Reel;
 
 /** Optional integration check against the installed fr.jar; no game process or save is used. */
 final class FastRendererChecks {
@@ -45,9 +47,17 @@ final class FastRendererChecks {
             Class<?> panelType=new BridgeLoader().loadClass("gamblingden.slots.SlotMachinePanel");
             BaseCustomUIPanelPlugin panel=factory.create(panelType);
             Method act=panelType.getDeclaredMethod("act",String.class); act.setAccessible(true);
+            Field bank=panelType.getDeclaredField("reels"); bank.setAccessible(true);
             for(int reels=1;reels<=5;reels++) {
                 act.invoke(panel,"reels:"+reels);
                 for(int frame=0;frame<120;frame++) {
+                    if(frame==60) {
+                        int i=0;
+                        for(Object value:(java.util.List<?>)bank.get(panel)) {
+                            Reel reel=(Reel)value;
+                            reel.spinning=true; reel.stopOn(Prize.values()[i++]); reel.snapToResult();
+                        }
+                    }
                     boolean clipped=frame%2==0;
                     enqueue.invoke(exec,(Runnable)()->{
                         if(clipped) GL11.glEnable(GL11.GL_SCISSOR_TEST); else GL11.glDisable(GL11.GL_SCISSOR_TEST);

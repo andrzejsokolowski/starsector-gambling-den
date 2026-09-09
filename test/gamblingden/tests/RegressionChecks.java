@@ -16,6 +16,7 @@ import com.fs.starfarer.api.combat.ShipHullSpecAPI;
 import com.fs.starfarer.api.combat.WeaponAPI.*;
 import com.fs.starfarer.api.fleet.FleetMemberAPI;
 import com.fs.starfarer.api.input.InputEventAPI;
+import com.fs.starfarer.api.graphics.SpriteAPI;
 import com.fs.starfarer.api.loading.*;
 import com.fs.starfarer.api.ui.*;
 import com.fs.starfarer.api.util.MutableValue;
@@ -43,6 +44,9 @@ public class RegressionChecks {
     private static PositionAPI position;
     private static CargoAPI cargo;
     private static InteractionDialogPlugin currentDialog;
+    private record DrawnIcon(String path, float x, float y, float alpha) { }
+    private static final List<DrawnIcon> drawnIcons = new ArrayList<>();
+    private static boolean recordIcons;
 
     interface Handler { Object call(Method method, Object[] args) throws Throwable; }
     @SuppressWarnings("unchecked")
@@ -86,9 +90,20 @@ public class RegressionChecks {
             default -> null;
         });
     }
+    private static SpriteAPI sprite(String path) {
+        float[] alpha={1f};
+        return proxy(SpriteAPI.class,(m,a)->switch(m.getName()) {
+            case "getTextureId" -> 1;
+            case "getWidth", "getHeight" -> 80f;
+            case "setAlphaMult" -> { alpha[0]=(Float)a[0]; yield null; }
+            case "renderAtCenter" -> { drawnIcons.add(new DrawnIcon(path,(Float)a[0],(Float)a[1],alpha[0])); yield null; }
+            default -> null;
+        });
+    }
     private static void reset() {
         saved.clear(); chips.clear(); known.clear(); hullmods.clear(); weapons.clear(); fleet.clear();
         guns.clear(); wings.clear(); text.clear(); options.clear(); credits=0; dismissals=0;
+        drawnIcons.clear(); recordIcons=false;
         WeaponPool.clearCache();
     }
     private static void setup() {
@@ -145,6 +160,7 @@ public class RegressionChecks {
             case "getAllBarEventSpecs" -> new ArrayList<>();
             case "getHullModSpec" -> hullmods.stream().filter(s->s.getId().equals(a[0])).findFirst().orElse(null);
             case "getScreenScaleMult" -> 1f;
+            case "getSprite" -> recordIcons ? sprite((String)a[0]) : null;
             case "createLabel" -> label();
             default -> null;
         }));
@@ -355,6 +371,83 @@ public class RegressionChecks {
         saved.put("hmd_tokens",42); TokenBank.migrateOldKeys();
         check(TokenBank.getTokens()==42 && !saved.containsKey("hmd_tokens"),"Token migration");
     }
+    private static void rewardDisplay() throws Exception {
+        Pbuffer buffer=new Pbuffer(1200,800,new PixelFormat(),null);
+        try {
+            buffer.makeCurrent();
+            for(Prize featured:Prize.values()) for(int count=1;count<=5;count++) for(int skip:new int[]{-1,0,90}) {
+                reset(); recordIcons=true; saved.put(Ids.KEY_TOKENS,10000);
+                for(int i=0;i<100;i++) hullmods.add(hullmod("display"+i,1));
+                weapons.add(weapon("displayWeapon",1,false));
+                SlotMachinePanel panel=machine();
+                invoke(panel,"act",String.class,"reels:"+count);
+                invoke(panel,"act",String.class,"pull");
+                List<Prize> symbols=new ArrayList<>();
+                Payout payout=new Payout();
+                for(int i=0;i<count;i++) {
+                    Prize prize=i==count/2 ? featured : Prize.values()[(i+count)%Prize.values().length];
+                    symbols.add(prize); payout.add(prize,prize.isCrate() ? 1 : 100);
+                }
+                set(panel,"pending",new SpinResult(symbols,payout,false));
+                // No native mouse device is needed for the campaign update callback.
+                panel.positionChanged(null);
+                for(int frame=0;frame<1800 && get(panel,"state").toString().equals("SPINNING");frame++) {
+                    if(frame==skip) invoke(panel,"act",String.class,"skip");
+                    panel.advance(1f/60f);
+                }
+                panel.positionChanged(position);
+                check(!get(panel,"state").toString().equals("SPINNING"),"Display test never settled");
+                List<?> reels=(List<?>)get(panel,"reels"), plates=(List<?>)get(panel,"plateLabels");
+                for(int i=0;i<count;i++) {
+                    check(((Reel)reels.get(i)).getPayLineSymbol()==symbols.get(i),"Landed symbol differs from payout symbol");
+                    check(((LabelAPI)plates.get(i)).getText().equals(symbols.get(i)==Prize.BUST ? "-" : symbols.get(i).label),"Reel label differs from symbol");
+                }
+                String won=((LabelAPI)get(panel,"resultLabel")).getText();
+                check(won.equals(payout.isEmpty() ? "Nothing on any reel." : "You won "+payout.describe()+"."),"Reward text differs from payout");
+                // Capture the actual SpriteAPI calls, including the coordinates used to draw
+                // the middle row, instead of only inspecting Reel.getPayLineSymbol().
+                drawnIcons.clear(); panel.renderBelow(1f);
+                float middleY=position.getY()+SlotMachinePanel.PANEL_H-158f-126f;
+                List<DrawnIcon> middle=drawnIcons.stream().filter(icon->Math.abs(icon.y()-middleY)<0.01f).toList();
+                List<String> expected=symbols.stream().filter(Prize::pays).map(prize->prize.icon).toList();
+                check(middle.stream().map(DrawnIcon::path).toList().equals(expected),"Drawn middle-row icons differ from prizes");
+                check(middle.stream().allMatch(icon->icon.alpha()==1f),"Reward row was dimmed");
+                check(drawnIcons.stream().filter(icon->Math.abs(icon.y()-middleY)>0.01f).allMatch(icon->icon.alpha()<0.3f),"Decorative symbols look like paid symbols");
+                if(!payout.isEmpty()) {
+                    invoke(panel,"act",String.class,"take");
+                    var receipt=payout.grant(new Random(1));
+                    check(((LabelAPI)get(panel,"resultLabel")).getText().equals("Collected: "+receipt.describe()+"."),"Collected text differs from receipt");
+                    check(chips.size()==receipt.getBlueprints() && guns.getOrDefault("displayWeapon",0)==receipt.getWeapons()
+                            && credits==receipt.getCredits(),"Cargo differs from displayed receipt");
+                }
+            }
+            // After a completed pull, changing settings must not pair new decorative icons
+            // with the old result. Clicking the current selection must not reroll them either.
+            for(String setting:List.of("stake:1","reels:2")) {
+                reset(); saved.put(Ids.KEY_TOKENS,1000);
+                SlotMachinePanel panel=machine();
+                invoke(panel,"act",String.class,"pull");
+                Payout payout=new Payout(); payout.add(Prize.CREDITS,777);
+                set(panel,"pending",new SpinResult(List.of(Prize.BUST,Prize.CREDITS,Prize.BUST),payout,false));
+                invoke(panel,"act",String.class,"skip");
+                invoke(panel,"settle",new Class<?>[0],new Object[0]);
+                invoke(panel,"act",String.class,"take");
+                String collected=((LabelAPI)get(panel,"resultLabel")).getText();
+                Object reel=((List<?>)get(panel,"reels")).get(0);
+                invoke(panel,"act",String.class,"stake:0"); invoke(panel,"act",String.class,"reels:3");
+                check(((List<?>)get(panel,"reels")).get(0)==reel && ((LabelAPI)get(panel,"resultLabel")).getText().equals(collected),"Current selection rerolled icons beside old reward text");
+                invoke(panel,"act",String.class,setting);
+                check(((LabelAPI)get(panel,"resultLabel")).getText().isEmpty(),"Settings change left stale reward text");
+                for(Object plate:(List<?>)get(panel,"plateLabels")) check(((LabelAPI)plate).getText().isEmpty(),"Settings change left stale reel labels");
+                check(get(panel,"pending")==null && (Float)get(panel,"winGlow")==0f && (Float)get(panel,"shake")==0f,"Settings change retained previous win state");
+                check(credits==777,"Changing settings changed collected payout");
+            }
+        } finally { buffer.destroy(); recordIcons=false; }
+    }
+
+    private static void invoke(Object instance, String name, Class<?>[] types, Object[] args) throws Exception {
+        Method method=instance.getClass().getDeclaredMethod(name,types); method.setAccessible(true); method.invoke(instance,args);
+    }
     private static void odds() {
         double[] expected={.0192,.048,.0832};
         for(int stake=0;stake<3;stake++) {
@@ -368,7 +461,7 @@ public class RegressionChecks {
         if(args.length>0 && args[0].equals("fast-renderer")) {
             setup(); FastRendererChecks.run(RegressionChecks::machine); return;
         }
-        setup(); reels(); prizes(); ships(); ui(); legacy(); odds();
+        setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); odds();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }

@@ -438,18 +438,33 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
 
     private void setReels(int count) {
         if (state != State.READY) return;
-        reelCount = SlotMachine.clampReels(count);
+        count = SlotMachine.clampReels(count);
+        if (count == reelCount) return;
+        reelCount = count;
         TokenBank.setReels(reelCount);
-        buildReels(false);
-        layoutPlates();
-        refresh();
+        resetDisplay();
     }
 
     private void setStake(int which) {
         if (state != State.READY) return;
-        stake = SlotMachine.clampStake(which);
+        which = SlotMachine.clampStake(which);
+        if (which == stake) return;
+        stake = which;
         TokenBank.setStake(stake);
+        resetDisplay();
+    }
+
+    /** A new setup has no result yet. Do not show the last prize beside fresh filler icons. */
+    private void resetDisplay() {
+        pending = null;
+        held = null;
+        winGlow = 0f;
+        shake = 0f;
+        stateTimer = 0f;
+        reelsStopped = 0;
+        resultLabel.setText("");
         buildReels(false);
+        layoutPlates();
         refresh();
     }
 
@@ -783,7 +798,9 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
             for (int i = 0; i < reel.strip.size(); i++) {
                 float centreY = topOfStrip - (i + 0.5f) * SLOT_H - reel.offset;
                 boolean onPayLine = reel.stopped && i == Reel.PAY_LINE;
-                drawSymbol(reel.strip.get(i), centreX, centreY, alphaMult, onPayLine);
+                // Neighbouring symbols are animation scenery, never part of the payout.
+                float symbolAlpha = alphaMult * (reel.stopped && !onPayLine ? 0.22f : 1f);
+                drawSymbol(reel.strip.get(i), centreX, centreY, symbolAlpha, onPayLine);
             }
 
         } finally {
@@ -796,6 +813,10 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
         GLDraw.verticalFade(x, y, w, 26f, WINDOW_BG, new Color(0, 0, 0, 0), alphaMult);
         GLDraw.innerShadow(x, y, w, WINDOW_H, 5f, alphaMult);
         GLDraw.frame(x, y, w, WINDOW_H, GLDraw.darken(TRIM, 0.35f), 2f, alphaMult * 0.8f);
+        if (reel.stopped) {
+            GLDraw.frame(x + 2f, y + (WINDOW_H - SLOT_H) / 2f, w - 4f, SLOT_H,
+                    reel.getPayLineSymbol().pays() ? PAY_LINE : TRIM, 1f, alphaMult * 0.6f);
+        }
     }
 
     private void clipWindow(float x, float y, float w, float h) {
