@@ -15,8 +15,8 @@ import gamblingden.prizes.Prize;
  * The machine's insides.
  *
  * Every reel is rolled on its own and pays on its own, so a pull is really several small bets
- * at once - there is no need to line three symbols up to get anything. Lining them all up is
- * still worth something: it doubles the lot.
+ * at once. Each reel busts most of the time - that is what makes the rest worth anything.
+ * Lining every reel up doubles the lot.
  */
 public class SlotMachine {
 
@@ -36,15 +36,19 @@ public class SlotMachine {
         return reels;
     }
 
-    /** Every symbol that can turn up at this stake, for filling the reels while they spin. */
+    /**
+     * The symbols on the strip at this stake, for the blur while the reels are turning.
+     * BUST is in there several times over, because that is most of what a strip is.
+     */
     public static List<Prize> stripFor(int stake) {
         List<Prize> out = new ArrayList<Prize>();
+        for (int i = 0; i < 4; i++) out.add(Prize.BUST);
+
         Map<Prize, Float> weights = Config.WEIGHTS[clampStake(stake)];
         for (Prize prize : Prize.values()) {
             Float weight = weights.get(prize);
             if (weight != null && weight > 0f) out.add(prize);
         }
-        if (out.isEmpty()) out.add(Prize.BUST);
         return out;
     }
 
@@ -77,10 +81,14 @@ public class SlotMachine {
         return new SpinResult(symbols, payout, fullHouse);
     }
 
+    /** One reel: mostly nothing, and now and then something. */
     private static Prize roll(int stake, Random random) {
+        if (random.nextFloat() >= Config.hitChance(stake)) return Prize.BUST;
+
         Map<Prize, Float> weights = Config.WEIGHTS[stake];
         WeightedRandomPicker<Prize> picker = new WeightedRandomPicker<Prize>(random);
         for (Prize prize : Prize.values()) {
+            if (!prize.pays()) continue;
             Float weight = weights.get(prize);
             if (weight != null && weight > 0f) picker.add(prize, weight);
         }
@@ -88,14 +96,17 @@ public class SlotMachine {
         return picked != null ? picked : Prize.BUST;
     }
 
-    /** A box is one box. Everything else pays a size that wobbles a bit either way. */
+    /**
+     * A crate is one crate - how much is inside it is the crate's own business, and set by the
+     * sliders. Cash and tokens pay a size that wobbles a bit either way.
+     */
     private static int amountFor(Prize prize, int stake, Random random) {
-        if (prize.isBox()) return 1;
+        if (prize.isCrate()) return 1;
 
-        int[] amounts = Config.AMOUNTS.get(prize);
-        if (amounts == null || stake >= amounts.length) return 1;
+        int base = prize == Prize.TOKENS
+                ? Config.tokensPaid(stake)
+                : Config.creditsPaid(stake);
 
-        float base = amounts[stake];
         float wobble = 1f + (random.nextFloat() * 2f - 1f) * Config.AMOUNT_VARIANCE;
         return Math.max(1, Math.round(base * wobble));
     }

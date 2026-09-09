@@ -10,12 +10,15 @@ import org.json.JSONObject;
 import com.fs.starfarer.api.Global;
 
 import gamblingden.prizes.Prize;
+import lunalib.lunaSettings.LunaSettings;
 
 /**
- * Every number the den runs on, read from data/config/gambling_den.json.
+ * Every number the den runs on.
  *
- * Editing that file and reloading a save is enough - no rebuild. Anything the file is
- * missing keeps the value written here, so a half-finished edit cannot break the mod.
+ * Anything a player is likely to want to move lives in the LunaLib settings page and is read
+ * live, so a slider takes effect on the next pull. The rest sits in
+ * data/config/gambling_den.json and is read on load. Either way a missing value falls back to
+ * what is written here, so a half-finished edit cannot break the mod.
  */
 public class Config {
 
@@ -23,19 +26,23 @@ public class Config {
 
     public static final int STAKE_COUNT = 3;
 
-    public static float SHIP_TOKENS_PER_FP = 0.6f;
+    public static float SHIP_TOKENS_PER_FP = 1.5f;
     public static float SHIP_TOKEN_PENALTY_PER_DMOD = 0.1f;
-    public static float TOKENS_PER_CREDIT_OF_DUPLICATE = 0.0005f;
+    public static float TOKENS_PER_CREDIT_OF_DUPLICATE = 0.0015f;
 
     public static int REELS_DEFAULT = 3;
     public static int REELS_MAX = 5;
     public static int[] STAKE_COST = { 2, 5, 12 };
 
-    /** Reel-strip weight for each prize, one map per stake. */
+    /** The chance a single reel pays anything at all. The rest of the time it busts. */
+    public static float[] HIT_CHANCE = { 0.16f, 0.20f, 0.26f };
+
+    /** Relative weights among the symbols that do pay, one map per stake. */
     public static Map<Prize, Float>[] WEIGHTS = defaultWeights();
 
-    /** Base payout for each prize, one entry per stake. Boxes are not in here. */
-    public static Map<Prize, int[]> AMOUNTS = defaultAmounts();
+    /** Credits and tokens paid by those symbols, one entry per stake. */
+    public static int[] CREDITS_PAID = { 8000, 25000, 60000 };
+    public static int[] TOKENS_PAID = { 8, 20, 45 };
 
     public static float AMOUNT_VARIANCE = 0.25f;
     public static int CREDITS_PER_BLUEPRINT_OWED = 20000;
@@ -44,31 +51,78 @@ public class Config {
     @SuppressWarnings("unchecked")
     private static Map<Prize, Float>[] defaultWeights() {
         Map<Prize, Float>[] out = new HashMap[STAKE_COUNT];
+        // tokens, credits, weapons s/m/l, boxes s/m/l
         float[][] rows = {
-                //bust  cred  supp  fuel  mach  weap  small med  large
-                { 45f,  15f,  13f,  11f,   8f,   5f,   3f,   0f,   0f },
-                { 42f,  15f,   8f,   7f,   6f,   8f,   9f,   5f,   0f },
-                { 38f,  13f,   4f,   4f,   3f,   9f,   8f,  13f,   8f },
+                { 34f, 30f, 24f,  6f,  0f,  6f,  0f,  0f },
+                { 30f, 26f, 14f, 12f,  2f, 10f,  6f,  0f },
+                { 26f, 22f,  6f, 14f,  8f,  8f, 11f,  5f },
+        };
+        Prize[] paying = {
+                Prize.TOKENS, Prize.CREDITS,
+                Prize.WEAPONS_SMALL, Prize.WEAPONS_MEDIUM, Prize.WEAPONS_LARGE,
+                Prize.BOX_SMALL, Prize.BOX_MEDIUM, Prize.BOX_LARGE,
         };
         for (int stake = 0; stake < STAKE_COUNT; stake++) {
             out[stake] = new HashMap<Prize, Float>();
-            Prize[] all = Prize.values();
-            for (int i = 0; i < all.length && i < rows[stake].length; i++) {
-                out[stake].put(all[i], rows[stake][i]);
+            for (int i = 0; i < paying.length; i++) {
+                out[stake].put(paying[i], rows[stake][i]);
             }
         }
         return out;
     }
 
-    private static Map<Prize, int[]> defaultAmounts() {
-        Map<Prize, int[]> out = new HashMap<Prize, int[]>();
-        out.put(Prize.CREDITS, new int[] { 3000, 9000, 25000 });
-        out.put(Prize.SUPPLIES, new int[] { 25, 70, 160 });
-        out.put(Prize.FUEL, new int[] { 25, 70, 160 });
-        out.put(Prize.MACHINERY, new int[] { 10, 30, 70 });
-        out.put(Prize.WEAPONS, new int[] { 1, 2, 4 });
-        return out;
+    // ------------------------------------------------------------------ LunaLib
+
+    /** LunaLib setting id for a crate's contents, e.g. gd_count_box_large. */
+    private static String countKey(Prize prize) {
+        return "gd_count_" + prize.id;
     }
+
+    /** How many things this crate holds right now, slider included. */
+    public static int countOf(Prize prize) {
+        Integer set = luna(countKey(prize));
+        if (set != null && set > 0) return set;
+        return prize.count;
+    }
+
+    public static int creditsPaid(int stake) {
+        Integer set = luna("gd_credits_" + stakeName(stake).toLowerCase());
+        if (set != null && set > 0) return set;
+        return CREDITS_PAID[stake];
+    }
+
+    public static int tokensPaid(int stake) {
+        Integer set = luna("gd_tokens_" + stakeName(stake).toLowerCase());
+        if (set != null && set > 0) return set;
+        return TOKENS_PAID[stake];
+    }
+
+    /** Chance a single reel pays anything, as a fraction. */
+    public static float hitChance(int stake) {
+        Integer set = luna("gd_hit_" + stakeName(stake).toLowerCase());
+        if (set != null && set > 0) return set / 100f;
+        return HIT_CHANCE[stake];
+    }
+
+    public static float shipTokensPerFleetPoint() {
+        try {
+            Float set = LunaSettings.getFloat(Ids.MOD_ID, "gd_ship_tokens_per_fp");
+            if (set != null && set > 0f) return set;
+        } catch (Exception e) {
+            // LunaLib not answering; the config file value stands.
+        }
+        return SHIP_TOKENS_PER_FP;
+    }
+
+    private static Integer luna(String key) {
+        try {
+            return LunaSettings.getInt(Ids.MOD_ID, key);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // --------------------------------------------------------------------- JSON
 
     public static void load() {
         try {
@@ -83,10 +137,15 @@ public class Config {
             REELS_MAX = Math.max(1, json.optInt("reelsMax", REELS_MAX));
             REELS_DEFAULT = Math.min(REELS_MAX, Math.max(1, json.optInt("reelsDefault", REELS_DEFAULT)));
 
-            JSONArray costs = json.optJSONArray("stakeCost");
-            if (costs != null) {
-                for (int i = 0; i < STAKE_COUNT && i < costs.length(); i++) {
-                    STAKE_COST[i] = Math.max(1, costs.optInt(i, STAKE_COST[i]));
+            readInts(json.optJSONArray("stakeCost"), STAKE_COST, 1);
+            readInts(json.optJSONArray("creditsPaid"), CREDITS_PAID, 0);
+            readInts(json.optJSONArray("tokensPaid"), TOKENS_PAID, 0);
+
+            JSONArray hits = json.optJSONArray("hitChance");
+            if (hits != null) {
+                for (int i = 0; i < STAKE_COUNT && i < hits.length(); i++) {
+                    HIT_CHANCE[i] = (float) Math.max(0.0, Math.min(1.0,
+                            hits.optDouble(i, HIT_CHANCE[i])));
                 }
             }
 
@@ -94,28 +153,15 @@ public class Config {
             readWeights(json, "weightsMid", 1);
             readWeights(json, "weightsHigh", 2);
 
-            JSONObject amounts = json.optJSONObject("amounts");
-            if (amounts != null) {
-                for (Prize prize : AMOUNTS.keySet()) {
-                    JSONArray row = amounts.optJSONArray(prize.id);
-                    if (row == null) continue;
-                    int[] target = AMOUNTS.get(prize);
-                    for (int i = 0; i < target.length && i < row.length(); i++) {
-                        target[i] = Math.max(0, row.optInt(i, target[i]));
-                    }
+            JSONObject counts = json.optJSONObject("crateContents");
+            if (counts != null) {
+                for (Prize prize : Prize.values()) {
+                    if (!prize.isCrate()) continue;
+                    prize.count = Math.max(1, counts.optInt(prize.id, prize.count));
                 }
             }
 
             AMOUNT_VARIANCE = (float) json.optDouble("amountVariance", AMOUNT_VARIANCE);
-
-            JSONObject boxes = json.optJSONObject("boxBlueprints");
-            if (boxes != null) {
-                for (Prize prize : Prize.values()) {
-                    if (!prize.isBox()) continue;
-                    prize.blueprints = Math.max(1, boxes.optInt(prize.id, prize.blueprints));
-                }
-            }
-
             CREDITS_PER_BLUEPRINT_OWED =
                     json.optInt("creditsPerBlueprintOwed", CREDITS_PER_BLUEPRINT_OWED);
             DOUBLE_OR_NOTHING_WIN_CHANCE =
@@ -127,17 +173,24 @@ public class Config {
         }
     }
 
+    private static void readInts(JSONArray from, int[] into, int floor) {
+        if (from == null) return;
+        for (int i = 0; i < into.length && i < from.length(); i++) {
+            into[i] = Math.max(floor, from.optInt(i, into[i]));
+        }
+    }
+
     private static void readWeights(JSONObject json, String key, int stake) {
         JSONObject row = json.optJSONObject(key);
         if (row == null) return;
         for (Prize prize : Prize.values()) {
+            if (!prize.pays()) continue;
             double weight = row.optDouble(prize.id, Double.NaN);
             if (Double.isNaN(weight)) continue;
             WEIGHTS[stake].put(prize, (float) Math.max(0.0, weight));
         }
     }
 
-    /** Reading order for the stake buttons. */
     public static String stakeName(int stake) {
         switch (stake) {
             case 0: return "Low";

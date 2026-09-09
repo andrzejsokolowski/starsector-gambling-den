@@ -8,12 +8,12 @@ import java.util.Random;
 
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CargoAPI;
-import com.fs.starfarer.api.impl.campaign.ids.Commodities;
 import com.fs.starfarer.api.loading.HullModSpecAPI;
 import com.fs.starfarer.api.loading.WeaponSpecAPI;
 
 import gamblingden.Config;
 import gamblingden.economy.BlueprintPool;
+import gamblingden.economy.TokenBank;
 
 /**
  * Everything one pull won, held back until the player decides to take it or risk it.
@@ -23,7 +23,7 @@ import gamblingden.economy.BlueprintPool;
  */
 public class Payout {
 
-    /** Prize to total amount. Insertion-ordered so the read-out lists the good things first. */
+    /** Prize to total amount. For crates the amount is how many crates, not what is in them. */
     private final Map<Prize, Integer> lots = new LinkedHashMap<Prize, Integer>();
 
     public void add(Prize prize, int amount) {
@@ -43,18 +43,32 @@ public class Payout {
         }
     }
 
-    /** How many hull mod blueprints are riding on this payout. */
-    public int getBlueprintCount() {
+    private int totalIn(boolean boxes) {
         int total = 0;
         for (Map.Entry<Prize, Integer> entry : lots.entrySet()) {
-            if (entry.getKey().isBox()) total += entry.getKey().blueprints * entry.getValue();
+            Prize prize = entry.getKey();
+            if (prize.isBox() != boxes || !prize.isCrate()) continue;
+            total += Config.countOf(prize) * entry.getValue();
         }
         return total;
     }
 
-    /** A short read-out for the machine's screen, e.g. "6 hull mod blueprints, 2 weapons". */
+    public int getBlueprintCount() {
+        return totalIn(true);
+    }
+
+    public int getWeaponCount() {
+        return totalIn(false);
+    }
+
+    private int amountOf(Prize prize) {
+        Integer had = lots.get(prize);
+        return had == null ? 0 : had;
+    }
+
+    /** A short read-out for the machine's screen. */
     public String describe() {
-        if (lots.isEmpty()) return "Nothing";
+        if (lots.isEmpty()) return "nothing";
 
         List<String> parts = new ArrayList<String>();
 
@@ -62,36 +76,21 @@ public class Payout {
         if (blueprints > 0) {
             parts.add(blueprints + (blueprints == 1 ? " hull mod blueprint" : " hull mod blueprints"));
         }
-        for (Map.Entry<Prize, Integer> entry : lots.entrySet()) {
-            Prize prize = entry.getKey();
-            int amount = entry.getValue();
-            if (prize.isBox()) continue;
-
-            switch (prize) {
-                case CREDITS:
-                    parts.add(group(amount) + " credits");
-                    break;
-                case WEAPONS:
-                    parts.add(amount + (amount == 1 ? " weapon" : " weapons"));
-                    break;
-                case SUPPLIES:
-                    parts.add(amount + " supplies");
-                    break;
-                case FUEL:
-                    parts.add(amount + " fuel");
-                    break;
-                case MACHINERY:
-                    parts.add(amount + " heavy machinery");
-                    break;
-                default:
-                    break;
-            }
+        int weapons = getWeaponCount();
+        if (weapons > 0) {
+            parts.add(weapons + (weapons == 1 ? " weapon" : " weapons"));
         }
+        int credits = amountOf(Prize.CREDITS);
+        if (credits > 0) parts.add(group(credits) + " credits");
+
+        int tokens = amountOf(Prize.TOKENS);
+        if (tokens > 0) parts.add(tokens + (tokens == 1 ? " token" : " tokens"));
+
         return join(parts);
     }
 
     /**
-     * Hands everything over. Returns one line per thing given, itemised, for the bar to print
+     * Hands everything over. Returns one line per thing given, itemised, for the den to print
      * once the player steps away from the machine.
      */
     public List<String> grant(Random random) {
@@ -104,12 +103,11 @@ public class Payout {
 
         for (Map.Entry<Prize, Integer> entry : lots.entrySet()) {
             Prize prize = entry.getKey();
-            int amount = entry.getValue();
+            int crates = entry.getValue();
 
             if (prize.isBox()) {
-                int wanted = prize.blueprints * amount;
                 List<String> names = new ArrayList<String>();
-                for (int i = 0; i < wanted; i++) {
+                for (int i = 0; i < Config.countOf(prize) * crates; i++) {
                     HullModSpecAPI spec = BlueprintPool.pickAny(random);
                     if (spec == null) {
                         owedBlueprints++;
@@ -122,38 +120,27 @@ public class Payout {
                     lines.add(names.size() + (names.size() == 1 ? " blueprint: " : " blueprints: ")
                             + join(names));
                 }
-                continue;
-            }
 
-            switch (prize) {
-                case CREDITS:
-                    cargo.getCredits().add(amount);
-                    lines.add(group(amount) + " credits");
-                    break;
-                case SUPPLIES:
-                    cargo.addCommodity(Commodities.SUPPLIES, amount);
-                    lines.add(amount + " supplies");
-                    break;
-                case FUEL:
-                    cargo.addCommodity(Commodities.FUEL, amount);
-                    lines.add(amount + " fuel");
-                    break;
-                case MACHINERY:
-                    cargo.addCommodity(Commodities.HEAVY_MACHINERY, amount);
-                    lines.add(amount + " heavy machinery");
-                    break;
-                case WEAPONS:
-                    List<String> weapons = new ArrayList<String>();
-                    for (int i = 0; i < amount; i++) {
-                        WeaponSpecAPI spec = WeaponPool.pick(random);
-                        if (spec == null) continue;
-                        cargo.addWeapons(spec.getWeaponId(), 1);
-                        weapons.add(spec.getWeaponName());
-                    }
-                    if (!weapons.isEmpty()) lines.add(join(weapons));
-                    break;
-                default:
-                    break;
+            } else if (prize.isWeaponCrate()) {
+                List<String> weapons = new ArrayList<String>();
+                for (int i = 0; i < Config.countOf(prize) * crates; i++) {
+                    WeaponSpecAPI spec = WeaponPool.pick(random);
+                    if (spec == null) continue;
+                    cargo.addWeapons(spec.getWeaponId(), 1);
+                    weapons.add(spec.getWeaponName());
+                }
+                if (!weapons.isEmpty()) {
+                    lines.add(weapons.size() + (weapons.size() == 1 ? " weapon: " : " weapons: ")
+                            + join(weapons));
+                }
+
+            } else if (prize == Prize.CREDITS) {
+                cargo.getCredits().add(crates);
+                lines.add(group(crates) + " credits");
+
+            } else if (prize == Prize.TOKENS) {
+                TokenBank.addTokens(crates);
+                lines.add(crates + (crates == 1 ? " token" : " tokens"));
             }
         }
 

@@ -51,14 +51,12 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     private static final float Y_TOKENS = 14f;
     private static final float Y_SETUP = 42f;
     private static final float H_SETUP = 28f;
-    private static final float Y_COST = 80f;
     private static final float Y_CABINET = 106f;
     private static final float H_CABINET = 362f;
     private static final float H_MARQUEE = 46f;
     private static final float Y_WINDOW = Y_CABINET + 52f;
     private static final float Y_PLATES = 414f;
     private static final float Y_RESULT = 486f;
-    private static final float Y_HINT = 538f;
     private static final float Y_ACTIONS = 578f;
     private static final float H_ACTION = 42f;
     private static final float LABEL_H = 18f;
@@ -159,9 +157,7 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
     private float shake;
 
     private LabelAPI tokenLabel;
-    private LabelAPI costLabel;
     private LabelAPI resultLabel;
-    private LabelAPI hintLabel;
     private final List<LabelAPI> plateLabels = new ArrayList<LabelAPI>();
 
     // ------------------------------------------------------------------- setup
@@ -206,9 +202,6 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
         tokenLabel = addLabel("", Color.WHITE, 0f, Y_TOKENS, PANEL_W, LABEL_H,
                 Alignment.MID, Fonts.DEFAULT_SMALL);
 
-        costLabel = addLabel("", DIM_TEXT, 0f, Y_COST, PANEL_W, LABEL_H,
-                Alignment.MID, Fonts.DEFAULT_SMALL);
-
         addLabel("GAMBLING DEN", TRIM, 0f, Y_CABINET + 14f, PANEL_W, 24f,
                 Alignment.MID, Fonts.ORBITRON_20AA);
 
@@ -219,9 +212,6 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
         layoutPlates();
 
         resultLabel = addLabel("", Color.WHITE, 40f, Y_RESULT, PANEL_W - 80f, 42f,
-                Alignment.MID, Fonts.DEFAULT_SMALL);
-
-        hintLabel = addLabel("", new Color(125, 130, 148), 0f, Y_HINT, PANEL_W, LABEL_H,
                 Alignment.MID, Fonts.DEFAULT_SMALL);
     }
 
@@ -317,9 +307,6 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
         int cost = SlotMachine.costOf(reelCount, stake);
 
         tokenLabel.setText(tokens + (tokens == 1 ? " token" : " tokens"));
-        costLabel.setText("This pull costs " + cost + (cost == 1 ? " token" : " tokens")
-                + "  -  " + Config.STAKE_COST[stake] + " a reel at "
-                + Config.stakeName(stake).toLowerCase() + " stakes");
 
         boolean ready = state == State.READY;
         boolean spinning = state == State.SPINNING;
@@ -340,16 +327,6 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
         setState(ACT_TAKE, offering, false);
         setState(ACT_DOUBLE, offering, false);
         setState(ACT_LEAVE, !spinning, false);
-
-        if (spinning) {
-            hintLabel.setText("");
-        } else if (offering) {
-            hintLabel.setText("Take it, or risk the whole payout on one more roll for double.");
-        } else if (tokens < cost) {
-            hintLabel.setText("Not enough tokens. Sell the keeper a hull, or drop to fewer reels.");
-        } else {
-            hintLabel.setText("Every reel pays on its own. Match them all and the payout doubles.");
-        }
     }
 
     // -------------------------------------------------------------------- play
@@ -467,7 +444,13 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
 
     private void skipAnimation() {
         if (state != State.SPINNING) return;
-        for (Reel reel : reels) reel.snapToResult();
+        // Tell every reel its result before snapping it. A reel that had not been given one
+        // yet would otherwise keep whatever filler happened to be on its pay line, and the
+        // name plates would then disagree with what the pull actually paid.
+        for (int i = 0; i < reels.size(); i++) {
+            reels.get(i).stopOn(symbolAt(i));
+            reels.get(i).snapToResult();
+        }
         reelsStopped = reels.size();
     }
 
@@ -772,8 +755,10 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
 
         // Clip the strip to the window so symbols slide in and out of view instead of
         // appearing over the cabinet.
+        float scale = Global.getSettings().getScreenScaleMult();
         GL11.glEnable(GL11.GL_SCISSOR_TEST);
-        GL11.glScissor((int) x, (int) y, (int) w, (int) WINDOW_H);
+        GL11.glScissor((int) (x * scale), (int) (y * scale),
+                (int) (w * scale), (int) (WINDOW_H * scale));
         GL11.glEnable(GL11.GL_TEXTURE_2D);
 
         float centreX = x + w / 2f;
@@ -810,21 +795,58 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
             return;
         }
 
-        SpriteAPI sprite = getSprite(symbol);
-        if (sprite == null) return;
-
         float size = highlight ? ICON * 1.1f : ICON;
+
+        SpriteAPI sprite = getSprite(symbol);
+        if (sprite == null) {
+            drawDrawnSymbol(symbol, cx, cy, size, alphaMult);
+            return;
+        }
+
         sprite.setSize(size, size);
         sprite.setAlphaMult(alphaMult);
+        sprite.setNormalBlend();
         sprite.setColor(highlight ? Color.WHITE : new Color(220, 222, 232));
         sprite.renderAtCenter(cx, cy);
+    }
+
+    /** A crate with one pip per size, for when the art will not load. */
+    private void drawDrawnSymbol(Prize symbol, float cx, float cy, float size, float alphaMult) {
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
+
+        float w = size;
+        float h = size * 0.78f;
+        Color body = symbol.color;
+        GLDraw.quad(cx - w / 2f, cy - h / 2f, w, h, GLDraw.darken(body, 0.6f), alphaMult);
+        GLDraw.frame(cx - w / 2f, cy - h / 2f, w, h, body, 2f, alphaMult);
+
+        int pips = symbol.size();
+        if (pips == 0) {
+            GLDraw.circle(cx, cy, size * 0.17f, body, alphaMult, 18);
+        } else {
+            for (int i = 0; i < pips; i++) {
+                GLDraw.circle(cx - (pips - 1) * 7f + i * 14f, cy, 3.5f, body, alphaMult, 12);
+            }
+        }
+
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
     }
 
     private SpriteAPI getSprite(Prize symbol) {
         if (sprites.containsKey(symbol)) return sprites.get(symbol);
         SpriteAPI sprite = null;
         try {
-            if (symbol.icon != null) sprite = Global.getSettings().getSprite(symbol.icon);
+            if (symbol.icon != null) {
+                sprite = Global.getSettings().getSprite(symbol.icon);
+                if (sprite != null && sprite.getTextureId() == 0) {
+                    // Not loaded yet. Ask for it, then look again.
+                    Global.getSettings().loadTexture(symbol.icon);
+                    sprite = Global.getSettings().getSprite(symbol.icon);
+                }
+                if (sprite != null && (sprite.getTextureId() == 0 || sprite.getWidth() <= 0f)) {
+                    sprite = null;
+                }
+            }
         } catch (Exception e) {
             sprite = null;
         }

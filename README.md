@@ -1,7 +1,7 @@
 # Gambling Den
 
-A back-room gambling den in the bar of any independent port. It takes surplus hulls as payment
-and pays out in whatever the reels feel like — cash, cargo, guns, and boxes of hull mod
+A back-room gambling den at every port of size 6 or more. It takes surplus hulls as payment and
+pays out in whatever the reels feel like — cash, tokens, weapon crates, and boxes of hull mod
 blueprints.
 
 Gathering hull mods from salvage is slow. This gives you something else to do with the pile of
@@ -23,11 +23,12 @@ worth tokens too.
 the pull costs what you tell it to cost. More reels is more chances at once; higher stakes puts
 better prizes on the strip, not better odds.
 
-**Pull.** Every reel is rolled and paid on its own — nothing has to line up for a pull to be
-worth something. Match every reel and the whole payout doubles.
+**Pull.** Every reel is rolled and paid on its own — nothing has to line up. Most reels bust,
+the way a slot machine is supposed to; the ones that do not are worth having. Match every reel
+and the whole payout doubles.
 
-**What comes out.** Credits, supplies, fuel, heavy machinery, weapon crates, and hull mod boxes:
-a small box is three blueprints, a medium six, a large ten, handed over in one go.
+**What comes out.** Credits, more tokens so you can keep going, weapon crates in three sizes, and
+hull mod boxes in three sizes — a large box is ten blueprints handed over at once.
 
 **It never gives you a duplicate.** Boxes skip anything you already know and anything you are
 already carrying a chip for, including within the same box. If the machine has run out of hull
@@ -40,14 +41,19 @@ Every action has a button. Space pulls and Escape leaves, but neither is the onl
 
 ## Tuning
 
-Every number lives in `data/config/gambling_den.json` and can be edited without rebuilding the
-mod: what a hull is worth, what a reel costs at each stake, the full reel strip for all three
-stakes, what every prize pays, how many blueprints are in each size of box, and the
-double-or-nothing chance.
+**LunaLib settings page**, adjustable with sliders while the game is running: how many blueprints
+are in each size of hull mod box, how many weapons in each size of crate (1 to 100 either way),
+what the cash and token symbols pay at each stake, the chance a reel pays anything at all, and
+what the keeper gives per fleet point of hull.
+
+**`data/config/gambling_den.json`** holds the deeper wiring — reel costs, the reel strip weights
+for all three stakes, the payout variance and the double-or-nothing chance. Edit and reload a
+save; no rebuild.
 
 ## Building
 
-Set `starsectorPath` in `gradle.properties` to your Starsector install, then:
+Requires LunaLib installed (it is found automatically under `mods/`). Set `starsectorPath` in
+`gradle.properties` to your Starsector install, then:
 
 ```
 ./gradlew jar

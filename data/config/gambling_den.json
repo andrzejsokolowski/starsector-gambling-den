@@ -1,65 +1,63 @@
 {
+	# Most of what you will want to move - crate sizes, cash and token payouts, and the odds -
+	# is on the LunaLib settings page for this mod, where it can be changed with a slider while
+	# the game is running. What is left here is the deeper wiring.
+
 	# ------------------------------------------------------------------ tokens
 	# Tokens are the only currency in the den, and hulls are the only way to buy them.
-	# A hull is priced on how much ship it is (fleet points), not what it would fetch
-	# at a market, so a pile of salvaged frigates is still worth trading.
-	# Kite ~2, Hammerhead ~6, Onslaught ~18.
-	"shipTokensPerFleetPoint": 0.6,
+	# A hull is priced on how much ship it is (fleet points), not what it would fetch at a
+	# market, so a pile of salvaged frigates is still worth trading. Overridden by the slider.
+	"shipTokensPerFleetPoint": 1.5,
 	# Each d-mod knocks this fraction off the price. Never drops below 20% of full.
 	"shipTokenPenaltyPerDMod": 0.1,
-	# Blueprint chips you have already read are worth this many tokens per credit
-	# of the hull mod's value.
-	"tokensPerCreditOfDuplicate": 0.0005,
+	# Blueprint chips you have already read are worth this many tokens per credit of value.
+	"tokensPerCreditOfDuplicate": 0.0015,
 
 	# ------------------------------------------------------------------ machine
-	# How many reels the machine starts set to, and the most it will run.
 	"reelsDefault": 3,
 	"reelsMax": 5,
-	# What one reel costs at each stake. The whole pull costs this times the reel count.
+	# What one reel costs at each stake, low / mid / high. The pull costs this times the reels.
 	"stakeCost": [2, 5, 12],
 
 	# ------------------------------------------------------------------- odds
-	# The reel strip at each stake, as relative weights. Every reel is rolled on its
-	# own and pays out on its own, so these are your odds per reel, not per pull.
-	# Higher stakes buy better boxes, not better luck.
+	# The chance one reel lands on anything at all. Everything else is a bust, and a bust is
+	# meant to be the ordinary outcome. Overridden by the sliders.
+	"hitChance": [0.16, 0.20, 0.26],
+
+	# When a reel does pay, this is what it pays, as relative weights. Higher stakes buy the
+	# bigger crates, not better luck.
 	"weightsLow": {
-		"bust": 45, "credits": 15, "supplies": 13, "fuel": 11, "machinery": 8,
-		"weapons": 5, "box_small": 3, "box_medium": 0, "box_large": 0
+		"tokens": 34, "credits": 30,
+		"weapons_small": 24, "weapons_medium": 6, "weapons_large": 0,
+		"box_small": 6, "box_medium": 0, "box_large": 0
 	},
 	"weightsMid": {
-		"bust": 42, "credits": 15, "supplies": 8, "fuel": 7, "machinery": 6,
-		"weapons": 8, "box_small": 9, "box_medium": 5, "box_large": 0
+		"tokens": 30, "credits": 26,
+		"weapons_small": 14, "weapons_medium": 12, "weapons_large": 2,
+		"box_small": 10, "box_medium": 6, "box_large": 0
 	},
 	"weightsHigh": {
-		"bust": 38, "credits": 13, "supplies": 4, "fuel": 4, "machinery": 3,
-		"weapons": 9, "box_small": 8, "box_medium": 13, "box_large": 8
+		"tokens": 26, "credits": 22,
+		"weapons_small": 6, "weapons_medium": 14, "weapons_large": 8,
+		"box_small": 8, "box_medium": 11, "box_large": 5
 	},
 
 	# ------------------------------------------------------------------ prizes
-	# What each symbol pays, listed low / mid / high stakes.
-	"amounts": {
-		"credits":   [3000, 9000, 25000],
-		"supplies":  [25, 70, 160],
-		"fuel":      [25, 70, 160],
-		"machinery": [10, 30, 70],
-		"weapons":   [1, 2, 4]
+	# Fallbacks for the sliders, used if LunaLib is not answering.
+	"crateContents": {
+		"box_small": 3, "box_medium": 6, "box_large": 10,
+		"weapons_small": 2, "weapons_medium": 5, "weapons_large": 12
 	},
-	# The prize actually varies by up to this fraction either way, so two of the same
-	# symbol do not pay exactly the same.
+	"creditsPaid": [8000, 25000, 60000],
+	"tokensPaid": [8, 20, 45],
+
+	# Cash and token payouts vary by up to this fraction either way.
 	"amountVariance": 0.25,
 
-	# How many hull mod blueprints come out of each size of box. These do not scale
-	# with the stakes - the box size is the prize.
-	"boxBlueprints": {
-		"box_small": 3,
-		"box_medium": 6,
-		"box_large": 10
-	},
-	# If the machine has run out of hull mods you do not already know, a box pays this
-	# many credits per blueprint it could not find instead.
+	# If the machine has run out of hull mods you do not already know, a box pays this many
+	# credits per blueprint it could not find instead.
 	"creditsPerBlueprintOwed": 20000,
 
-	# ------------------------------------------------------------ double or nothing
 	# The chance the machine doubles a winning pull instead of keeping the lot.
 	"doubleOrNothingWinChance": 0.45
 }

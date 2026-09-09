@@ -51,7 +51,7 @@ public class ShipTradeIn {
         }
         float condition = Math.max(0.2f, 1f - dMods * Config.SHIP_TOKEN_PENALTY_PER_DMOD);
 
-        int tokens = Math.round(points * Config.SHIP_TOKENS_PER_FP * condition);
+        int tokens = Math.round(points * Config.shipTokensPerFleetPoint() * condition);
         return Math.max(1, tokens);
     }
 
