@@ -63,7 +63,8 @@ public final class PachinkoBoard {
     /** Fast-forward the SAME simulation for Skip/Leave; never reroll or refund a losing ball. */
     public void finish() { while (!isFinished()) step(); }
 
-    private void step() {
+    void step() {
+        if (isFinished()) return;
         if (++steps > MAX_STEPS) { jammed = true; return; }
         vy = Math.min(380, vy + 950 * STEP);
         vx *= .989;
@@ -116,5 +117,38 @@ public final class PachinkoBoard {
 
     public static int pocketAt(float x) {
         return Math.max(0, Math.min(POCKETS - 1, (int) (x / POCKET_WIDTH)));
+    }
+
+    /** Equal-mass ball collision. Pocket dividers remain solid after a ball enters one. */
+    boolean collide(PachinkoBoard other) {
+        if (isFinished() || other.isFinished()) return false;
+        if (channel >= 0 && other.channel >= 0 && channel != other.channel) return false;
+        double dx = other.x - x, dy = other.y - y;
+        double diameter = BALL_RADIUS * 2;
+        double distance2 = dx * dx + dy * dy;
+        if (distance2 >= diameter * diameter) return false;
+        double distance = Math.sqrt(distance2);
+        double nx = distance > .00001 ? dx / distance : 1;
+        double ny = distance > .00001 ? dy / distance : 0;
+        double separation = (diameter - distance + .01) / 2;
+        x -= nx * separation; y -= ny * separation;
+        other.x += nx * separation; other.y += ny * separation;
+        double closing = (other.vx - vx) * nx + (other.vy - vy) * ny;
+        if (closing < 0) {
+            double impulse = -(1 + .65) * closing / 2;
+            vx -= impulse * nx; vy -= impulse * ny;
+            other.vx += impulse * nx; other.vy += impulse * ny;
+        }
+        constrainAfterCollision(); other.constrainAfterCollision();
+        return true;
+    }
+
+    private void constrainAfterCollision() {
+        double left = channel < 0 ? BALL_RADIUS : channel * POCKET_WIDTH + BALL_RADIUS + 1;
+        double right = channel < 0 ? WIDTH - BALL_RADIUS : (channel + 1) * POCKET_WIDTH - BALL_RADIUS - 1;
+        x = Math.max(left, Math.min(right, x));
+        y = Math.max(channel < 0 ? BALL_RADIUS : POCKET_TOP, Math.min(FLOOR - BALL_RADIUS, y));
+        vx = Math.max(-260, Math.min(260, vx));
+        vy = Math.max(-380, Math.min(380, vy));
     }
 }

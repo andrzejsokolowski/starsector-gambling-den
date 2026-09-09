@@ -52,9 +52,11 @@ Every action has a button. Space pulls and Escape leaves, but neither is the onl
 
 ## Pachinko
 
-Choose **Hullmods**, **Weapons**, or **Tokens**, then buy one ball with the Drop ball button.
-One ball runs at a time. Default prices are 4 tokens for a hullmod ball, 2 for a weapon ball,
-and 2 for a token ball. The ball falls from the centre and bounces through ten rows of pegs.
+Choose **Hullmods**, **Weapons**, or **Tokens**, then drop **1, 10 or 50 balls**. Keep buying
+balls while earlier ones are falling. Each button shows the full cost of its batch; purchases
+are all-or-nothing. Default prices per ball are 4 tokens for hullmods, 2 for weapons, and 2
+for tokens. Balls feed rapidly from the centre, bouncing off ten rows of pegs and each other.
+The board allows up to 100 falling or queued balls at once. Landed balls free room for more.
 
 The pocket amounts, from left to right, are:
 
@@ -64,19 +66,26 @@ These are direct quantities. An 8 on the hullmod board gives eight random bluepr
 not eight boxes and not a second roll for a prize. The centre pays nothing; the outer pockets
 are the rare large wins. Rewards enter cargo or the token balance when the ball lands.
 
-The visible ball's actual landing pocket decides the reward. The simulation uses fixed time
-steps, so frame rate does not change the result. **Finish drop** advances the same ball to its
-landing. Leave, Escape, or an external dialog closure also finish and pay a purchased ball once.
-An exceptional stuck ball refunds its price instead of inventing a landing.
+Each visible ball's actual landing pocket decides its reward. Ball-to-ball collisions can
+change its path and result. All balls share one fixed-step simulation, so frame rate does not
+change the result for the same launches. **Finish all** advances that same shared simulation.
+Leave, Escape, or an external dialog closure also finish and settle every purchased ball,
+including the queued ones, exactly once. An exceptional stuck ball refunds its price.
+The result line totals the actual rewards and refunds for the run.
 
-Before a hullmod bet, pocket amounts are capped to the number of eligible blueprints left.
-The board shows the reduced amounts and a shortage notice. It never substitutes credits.
-An exhausted category cannot accept a bet. If another mod makes the promised reward unavailable
-during a drop, that ball is refunded. If settings or availability change after the displayed
-quote, the next Drop click refreshes the board without charging; click again to accept it.
+Before a hullmod run, pocket amounts are capped to the number of eligible blueprints left.
+During a run, the displayed board stays fixed and balls share the remaining stock. A ball
+whose prize cannot be filled is refunded in full; once stock is empty, remaining balls refund
+their cost even if they land in zero. This is stated before buying. There are no duplicate
+blueprints or credit substitutions. An exhausted category cannot accept new bets.
 
-Category choices are mutually exclusive and stay locked during a drop. All actions are
-clickable. Space drops or finishes a ball; Escape leaves. There are no tutorial panels.
+Live setting edits apply after the board clears, including for extra balls bought during a
+run: they use the same price and pocket amounts still shown on the board. If settings or
+availability differ from the quote before a new run, the next purchase click refreshes the
+board without charging; click again to accept it.
+
+Category choices are mutually exclusive and stay locked while balls remain. All actions are
+clickable. Space adds one ball, including during a run; Escape leaves. There are no tutorial panels.
 
 ## Tuning
 
@@ -114,6 +123,18 @@ If `fr.jar` is installed in `starsector-core`, the checks also send 1,200 panel 
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
 
+## Changes in 1.1.1
+
+Adds continuous multi-ball Pachinko, 1/10/50-ball buttons, a rapid central launcher, and real
+ball-to-ball collisions. Up to 100 balls can be queued or falling at once. The board displays
+live ball counts and combined winnings. Finish all and every exit settle the entire paid run.
+Slots, ball prices and pocket amounts are unchanged.
+
+Checks include 5,000 colliding balls, 50/100-ball frame-rate comparisons, all reward categories,
+scarce stock, live setting edits, 6,000-item batch payouts, real mouse hitboxes, queued-ball
+settlement on every exit, and a 100-ball board through Fast Rendering. Multi-ball play still
+needs an in-game playtest.
+
 ## Changes in 1.1.0
 
 Adds Pachinko as a separate game in the den. Includes targeted categories, the 16–0–16 pocket
@@ -123,7 +144,7 @@ Slots rules and odds are unchanged from the playtested 1.0.0 release.
 Checks cover 10,000 physical ball drops, frame-rate and skip consistency, all pockets in all
 three reward categories, mouse hitboxes, safe dismissal, exact cargo transfers, settings
 changes during a drop, 100-item rewards, exhausted pools, and the Fast Rendering bridge.
-Pachinko has not yet been playtested in a live campaign.
+The user confirmed that the single-ball Pachinko game worked in a live campaign.
 
 ## Release 1.0.0
 

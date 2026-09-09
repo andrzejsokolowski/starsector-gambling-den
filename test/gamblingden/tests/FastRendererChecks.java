@@ -83,7 +83,8 @@ final class FastRendererChecks {
             Method pachinkoAct=pachinkoType.getDeclaredMethod("act",String.class); pachinkoAct.setAccessible(true);
             gamblingden.economy.TokenBank.addTokens(1000);
             pachinkoAct.invoke(pachinko,"category:TOKENS");
-            pachinkoAct.invoke(pachinko,"drop");
+            pachinkoAct.invoke(pachinko,"drop50");
+            pachinkoAct.invoke(pachinko,"drop50");
             for(int frame=0;frame<600;frame++) {
                 if(frame==300) pachinkoAct.invoke(pachinko,"skip");
                 pachinko.advance(1f/60);
@@ -144,7 +145,7 @@ final class FastRendererChecks {
 
         @Override protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
             if(!name.equals("gamblingden.slots.SlotMachinePanel") && !name.startsWith("gamblingden.slots.SlotMachinePanel$")
-                    && !name.equals("gamblingden.pachinko.PachinkoPanel") && !name.startsWith("gamblingden.pachinko.PachinkoPanel$")
+                    && !name.startsWith("gamblingden.pachinko.")
                     && !name.equals("gamblingden.ui.GLDraw")) return super.loadClass(name,resolve);
             Class<?> loaded=findLoadedClass(name);
             if(loaded==null) {

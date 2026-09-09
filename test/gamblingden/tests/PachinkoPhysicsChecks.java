@@ -44,5 +44,48 @@ final class PachinkoPhysicsChecks {
         if (invalid.isJammed()) throw new AssertionError("Invalid delta corrupted board");
         System.out.println("PASS: pachinko physics, 10000 complete balls and 1600 frame-rate/skip comparisons.");
     }
-    public static void main(String[] args) { run(); }
+    private static gamblingden.pachinko.PachinkoSwarm swarm(int seed, int count) {
+        var swarm = new gamblingden.pachinko.PachinkoSwarm();
+        Random random = new Random(seed);
+        for (int i = 0; i < count; i++) swarm.add(new PachinkoBoard(new Random(random.nextLong())));
+        return swarm;
+    }
+
+    static void multiBall() {
+        int jams = 0, contacts = 0, changed = 0;
+        int[] histogram = new int[11];
+        for (int seed = 0; seed < 100; seed++) {
+            var together = swarm(seed, 50);
+            var alone = swarm(seed, 50);
+            together.finish(null);
+            contacts += together.getCollisions();
+            for (int i = 0; i < 50; i++) {
+                var ball = together.balls().get(i);
+                var independent = alone.balls().get(i); independent.finish();
+                if (ball.isJammed()) jams++; else histogram[ball.getPocket()]++;
+                if (ball.getPocket() != independent.getPocket()) changed++;
+                if (!ball.isFinished() || ball.getX() < 6 || ball.getX() > PachinkoBoard.WIDTH - 6
+                        || !Float.isFinite(ball.getY())) throw new AssertionError("Invalid multi-ball position");
+                if (!ball.isJammed() && ball.getPocket() != PachinkoBoard.pocketAt(ball.getX())) throw new AssertionError("Collision moved ball out of paid pocket");
+            }
+        }
+        System.out.println("Multiball: 5000 balls; jams="+jams+"; ball contacts="+contacts+"; collision-changed outcomes="+changed
+                +"; pockets="+Arrays.toString(histogram));
+        if (jams != 0 || contacts == 0 || changed == 0) throw new AssertionError("Multi-ball collision failure");
+        for (int seed = 0; seed < 10; seed++) {
+            var baseline = swarm(seed, 100); baseline.finish(null);
+            for (float dt : new float[]{1f/240,1f/60,1f/20,.5f}) {
+                var animated = swarm(seed,100);
+                for (int frame=0;frame<10000 && !animated.isFinished();frame++) animated.advance(dt,null);
+                if (!animated.isFinished()) throw new AssertionError("Multi-ball animation stuck");
+                for(int i=0;i<100;i++) if(animated.balls().get(i).getPocket()!=baseline.balls().get(i).getPocket())
+                    throw new AssertionError("Frame rate changed shared physics");
+                var skip = swarm(seed,100); skip.advance(dt,null); skip.finish(null); skip.finish(null);
+                for(int i=0;i<100;i++) if(skip.balls().get(i).getPocket()!=baseline.balls().get(i).getPocket())
+                    throw new AssertionError("Finish all changed shared physics");
+            }
+        }
+        System.out.println("PASS: 50/100-ball collisions and frame-rate/finish consistency.");
+    }
+    public static void main(String[] args) { if(args.length==0) run(); multiBall(); }
 }

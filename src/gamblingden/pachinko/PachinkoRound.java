@@ -33,6 +33,7 @@ public final class PachinkoRound {
     public final PachinkoBoard board;
     private final Random rewards;
     private boolean settled;
+    private int awarded, refunded;
     private String result = "";
     private final List<String> log = new ArrayList<String>();
 
@@ -64,11 +65,28 @@ public final class PachinkoRound {
 
     /** Reject a stale display before charging, so changed settings cannot silently change a bet. */
     public static PachinkoRound buy(Offer shown, Random random) {
+        List<PachinkoRound> batch = buyBatch(shown, 1, random, false);
+        return batch.isEmpty() ? null : batch.get(0);
+    }
+
+    public static boolean stockAvailable(Category category) {
+        return category == Category.TOKENS || (category == Category.HULLMODS
+                ? !BlueprintPool.getEligible().isEmpty() : !WeaponPool.isEmpty());
+    }
+
+    /** One atomic charge: a batch is purchased in full or not at all. During a live run the
+     * displayed board stays fixed; edited settings apply after the board is cleared. */
+    public static List<PachinkoRound> buyBatch(Offer shown, int count, Random random, boolean liveBoard) {
+        List<PachinkoRound> batch = new ArrayList<PachinkoRound>();
+        if (count < 1 || count > PachinkoSwarm.MAX_PENDING) return batch;
         Offer current = offer(shown.category);
-        if (current.cost != shown.cost || !java.util.Arrays.equals(current.amounts, shown.amounts)
-                || !current.canBuy()) return null;
-        PachinkoRound round = new PachinkoRound(shown, random);
-        return TokenBank.spendTokens(shown.cost) ? round : null;
+        if ((!liveBoard && (current.cost != shown.cost || !java.util.Arrays.equals(current.amounts, shown.amounts)))
+                || shown.maximum() == 0 || !stockAvailable(shown.category)) return batch;
+        long cost = (long) shown.cost * count;
+        if (cost > TokenBank.getTokens()) return batch;
+        for (int i = 0; i < count; i++) batch.add(new PachinkoRound(shown, random));
+        if (!TokenBank.spendTokens((int) cost)) batch.clear();
+        return batch;
     }
 
     private PachinkoRound(Offer offer, Random random) {
@@ -79,15 +97,18 @@ public final class PachinkoRound {
 
     public boolean isSettled() { return settled; }
     public String getResult() { return result; }
+    public int getAwarded() { return awarded; }
+    public int getRefunded() { return refunded; }
     public List<String> getLog() { return new ArrayList<String>(log); }
     public void advance(float seconds) { if (!settled) { board.advance(seconds); settle(); } }
     public void finish() { if (!settled) { board.finish(); settle(); } }
 
-    private void settle() {
+    void settle() {
         if (settled || !board.isFinished()) return;
         // Mark first: duplicate UI callbacks must never award/refund a ball twice.
         settled = true;
         if (board.isJammed()) { refund("Ball jammed"); return; }
+        if (!stockAvailable(offer.category)) { refund("Reward stock exhausted"); return; }
         int amount = offer.amount(board.getPocket());
         if (amount == 0) { result = "Nothing."; return; }
         // Another mod can change cargo during a custom dialog. Never silently replace a
@@ -102,12 +123,14 @@ public final class PachinkoRound {
                 : offer.category == Category.WEAPONS ? Prize.WEAPONS_SMALL : Prize.TOKENS;
         payout.addUnits(prize, amount);
         Payout.Receipt receipt = payout.grant(rewards);
+        awarded = receipt.getBlueprints() + receipt.getWeapons() + receipt.getTokens();
         result = "Won " + receipt.describe() + ".";
         log.addAll(receipt.getLines());
     }
 
     private void refund(String reason) {
         int returned = TokenBank.addTokens(offer.cost);
+        refunded = returned;
         result = reason + "; " + returned + (returned == 1 ? " token refunded." : " tokens refunded.");
         log.add(result);
     }

@@ -538,10 +538,10 @@ public class RegressionChecks {
             // Click real hitboxes: category selector, Drop, attempted mid-flight selector.
             invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{600f,85f,true});
             invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{600f,85f,false});
-            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,623f,true});
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{140f,623f,true});
             var round=(gamblingden.pachinko.PachinkoRound)get(panel,"round");
             check(round!=null && TokenBank.getTokens()==98,"Pachinko mouse Drop does not work");
-            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,623f,true});
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{140f,623f,true});
             check(get(panel,"round")==round && TokenBank.getTokens()==98,"Held mouse bought extra balls");
             invoke(panel,"act",String.class,"category:WEAPONS");
             check(get(panel,"category")==gamblingden.pachinko.PachinkoSettings.Category.TOKENS,"Category changed mid-flight");
@@ -633,8 +633,103 @@ public class RegressionChecks {
                     gamblingden.pachinko.PachinkoRound.offer(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS),new Random(7));
             known.add("disappears"); disappearing.finish(); disappearing.finish();
             check(TokenBank.getTokens()==100 && chips.isEmpty() && credits==0 && disappearing.getResult().contains("refunded"),"Unavailable target was not refunded exactly once");
+
+            reset(); TokenBank.addTokens(10000); weapons.add(weapon("bulk",1,false));
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,100);
+            settings.put("gd_pachinko_cost_weapons",7);
+            var liveBoard=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+            invoke(liveBoard,"act",String.class,"category:WEAPONS");
+            invoke(liveBoard,"act",String.class,"drop10");
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,1);
+            settings.put("gd_pachinko_cost_weapons",1000);
+            invoke(liveBoard,"act",String.class,"drop50");
+            check(TokenBank.getTokens()==9580,"Live board did not preserve displayed price for additional balls");
+            invoke(liveBoard,"act",String.class,"skip");
+            check(guns.get("bulk")==6000 && TokenBank.getTokens()==9580,"Multi-ball 100-item setting lost or multiplied rewards");
+            invoke(liveBoard,"act",String.class,"drop");
+            check(TokenBank.getTokens()==9580 && ((List<?>)get(liveBoard,"rounds")).isEmpty(),"Next run silently accepted changed settings");
+            invoke(liveBoard,"act",String.class,"drop"); invoke(liveBoard,"act",String.class,"skip");
+            check(TokenBank.getTokens()==8580 && guns.get("bulk")==6001,"Next run did not use fresh settings");
         } finally {
             lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous); loader.setHasLoaded(loaded);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void pachinkoBatches() throws Exception {
+        // Real buttons can launch 50, then 10 more while earlier balls are still falling.
+        reset(); TokenBank.addTokens(2000);
+        var panel=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+        invoke(panel,"act",String.class,"category:TOKENS");
+        invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{540f,623f,true});
+        var live=(List<gamblingden.pachinko.PachinkoRound>)get(panel,"rounds");
+        check(live.size()==50 && TokenBank.getTokens()==1900,"50-ball button cost/quantity mismatch");
+        panel.advance(.2f);
+        var swarm=(gamblingden.pachinko.PachinkoSwarm)get(panel,"swarm");
+        check(swarm.launched()>1 && swarm.pending()>1,"Balls still run one at a time");
+        invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,623f,false});
+        invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,623f,true});
+        check(live.size()==60 && TokenBank.getTokens()==1880,"Cannot add paid balls during a run");
+        panel.processInput(List.of(key(Keyboard.KEY_SPACE)));
+        check(live.size()==61 && TokenBank.getTokens()==1878,"Space still skips instead of adding a ball");
+        invoke(panel,"act",String.class,"drop50");
+        check(live.size()==61 && TokenBank.getTokens()==1878,"Over-cap batch partially charged");
+        var all=new ArrayList<>(live);
+        invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{725f,623f,false});
+        invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{725f,623f,true});
+        int winnings=all.stream().mapToInt(gamblingden.pachinko.PachinkoRound::getAwarded).sum();
+        check(TokenBank.getTokens()==1878+winnings && all.stream().allMatch(gamblingden.pachinko.PachinkoRound::isSettled),"Finish all lost batch payout");
+        check(live.isEmpty() && swarm.balls().isEmpty(),"Completed physics bodies retained during continuous play");
+        check(((LabelAPI)get(panel,"result")).getText().contains(winnings+" tokens")
+                && ((LabelAPI)get(panel,"result")).getText().contains("61/61"),"Batch total not displayed accurately");
+        check(swarm.getCollisions()>0,"UI does not use ball-to-ball collisions");
+        int after=TokenBank.getTokens(); panel.finishOnDismissal(); panel.finishOnDismissal();
+        check(TokenBank.getTokens()==after,"Batch double-paid on close");
+
+        // Every exit settles every purchased ball, including balls still inside the launcher.
+        for(String exit:List.of("escape","leave","external")) {
+            reset(); TokenBank.addTokens(1000);
+            var game=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+            invoke(game,"act",String.class,"category:TOKENS"); invoke(game,"act",String.class,"drop50");
+            var balls=new ArrayList<>((List<gamblingden.pachinko.PachinkoRound>)get(game,"rounds"));
+            if(exit.equals("escape")) game.processInput(List.of(key(Keyboard.KEY_ESCAPE)));
+            if(exit.equals("leave")) invoke(game,"act",String.class,"leave");
+            if(exit.equals("external")) new gamblingden.pachinko.PachinkoDialogDelegate(game,()->{}).reportDismissed(0);
+            game.finishOnDismissal();
+            int paid=balls.stream().mapToInt(gamblingden.pachinko.PachinkoRound::getAwarded).sum();
+            check(balls.stream().allMatch(gamblingden.pachinko.PachinkoRound::isSettled) && TokenBank.getTokens()==900+paid,"Lost queued ball on "+exit);
+        }
+
+        reset(); TokenBank.addTokens(99);
+        var unaffordable=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+        invoke(unaffordable,"act",String.class,"category:TOKENS"); invoke(unaffordable,"act",String.class,"drop50");
+        check(TokenBank.getTokens()==99 && ((List<?>)get(unaffordable,"rounds")).isEmpty(),"Unaffordable batch spent some tokens");
+
+        // Stock exhaustion and settlement order must match across frame rates and Finish all.
+        for(var category:gamblingden.pachinko.PachinkoSettings.Category.values()) {
+            String baseline=null;
+            for(float dt:new float[]{0,1f/240,1f/60,1f/20,.5f}) {
+                reset(); TokenBank.addTokens(5000);
+                for(int i=0;i<18;i++) hullmods.add(hullmod("batch_"+i,1));
+                weapons.add(weapon("batch_gun",1,false));
+                var game=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+                invoke(game,"act",String.class,"category:"+category.name());
+                ((Random)get(game,"random")).setSeed(9187);
+                invoke(game,"act",String.class,"drop50");
+                var balls=new ArrayList<>((List<gamblingden.pachinko.PachinkoRound>)get(game,"rounds"));
+                if(dt==0) invoke(game,"act",String.class,"skip");
+                else for(int frame=0;frame<10000 && !((List<?>)get(game,"rounds")).isEmpty();frame++) game.advance(dt);
+                check(balls.size()==50 && balls.stream().allMatch(gamblingden.pachinko.PachinkoRound::isSettled),"Not all category balls settled");
+                int units=balls.stream().mapToInt(gamblingden.pachinko.PachinkoRound::getAwarded).sum();
+                int refunds=balls.stream().mapToInt(gamblingden.pachinko.PachinkoRound::getRefunded).sum();
+                check(TokenBank.getTokens()==5000-50*balls.get(0).offer.cost+refunds+(category.name().equals("TOKENS")?units:0),"Shared-category accounting mismatch");
+                check(chips.size()==(category.name().equals("HULLMODS")?units:0) && guns.getOrDefault("batch_gun",0)==(category.name().equals("WEAPONS")?units:0)
+                        && credits==0,"Wrong cargo from shared board");
+                String state=balls.stream().map(b->b.board.getPocket()+":"+b.getResult()).toList().toString()+new java.util.TreeSet<>(chips)+TokenBank.getTokens();
+                if(baseline==null) baseline=state;
+                else check(state.equals(baseline),"FPS/skip changed scarce stock settlement order");
+                game.finishOnDismissal();
+            }
         }
     }
 
@@ -643,7 +738,7 @@ public class RegressionChecks {
             setup(); FastRendererChecks.run(RegressionChecks::machine); return;
         }
         setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
-        PachinkoPhysicsChecks.run(); pachinko(); pachinkoSettings();
+        PachinkoPhysicsChecks.run(); PachinkoPhysicsChecks.multiBall(); pachinko(); pachinkoSettings(); pachinkoBatches();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }

@@ -115,6 +115,10 @@ public final class PachinkoPreview {
             for(int frame=0;frame<90;frame++) panel.advance(1f/60);
             save(panel,"falling");
             act.invoke(panel,"skip"); save(panel,"won");
+            act.invoke(panel,"drop50");
+            for(int frame=0;frame<80;frame++) panel.advance(1f/60);
+            save(panel,"multiball");
+            act.invoke(panel,"skip"); save(panel,"batch-paid");
         } finally { buffer.destroy(); }
     }
 }

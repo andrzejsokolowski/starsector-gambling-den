@@ -34,11 +34,17 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
     private Category category = Category.HULLMODS;
     private PachinkoRound.Offer offer;
     private PachinkoRound round;
+    private final List<PachinkoRound> rounds = new ArrayList<PachinkoRound>();
+    private PachinkoSwarm swarm = new PachinkoSwarm();
+    private PachinkoBoard lastLanded;
+    private final float[] pocketGlow = new float[PachinkoBoard.POCKETS];
+    private long purchased, completed, awarded, refunded;
+    private boolean stockAvailable;
     private CustomPanelAPI panel;
     private DialogCallbacks callbacks;
     private PositionAPI position;
     private LabelAPI tokens, result, notice;
-    private boolean dismissed, wasMouseDown, published;
+    private boolean dismissed, wasMouseDown;
 
     private static final class Btn {
         final String action;
@@ -68,10 +74,13 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
         }
         result = label("", Color.WHITE, 24, 546, PANEL_W - 48, 22, Fonts.DEFAULT_SMALL);
         notice = label("", DIM, 24, 573, PANEL_W - 48, 18, Fonts.DEFAULT_SMALL);
-        button("drop", "", 234, 608, 236, 36);
-        button("skip", "Finish drop", 484, 608, 144, 36);
-        button("leave", "Leave", 642, 608, 124, 36);
+        button("drop", "", 62, 608, 170, 36);
+        button("drop10", "", 244, 608, 190, 36);
+        button("drop50", "", 446, 608, 200, 36);
+        button("skip", "Finish all", 658, 608, 144, 36);
+        button("leave", "Leave", 814, 608, 124, 36);
         offer = PachinkoRound.offer(category);
+        stockAvailable = PachinkoRound.stockAvailable(category);
         refresh();
     }
 
@@ -88,11 +97,20 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
         buttons.add(button);
     }
 
-    private boolean running() { return round != null && !round.isSettled(); }
+    private boolean running() { return !rounds.isEmpty(); }
 
     private void refresh() {
-        tokens.setText(TokenBank.getTokens() + " tokens");
-        notice.setText(offer.notice);
+        int pending = swarm.pending();
+        tokens.setText(TokenBank.getTokens() + " tokens" + (running()
+                ? "  |  " + (pending - swarm.queued()) + " falling  |  " + swarm.queued() + " queued" : ""));
+        notice.setText(!stockAvailable ? (running() ? "Reward stock exhausted; remaining paid balls will be refunded."
+                : category == Category.HULLMODS ? "No unowned hullmod blueprints left." : "No eligible weapons available.")
+                : category == Category.HULLMODS && stockAvailable
+                ? (offer.notice.isEmpty() ? "Shared hullmod stock; unavailable ball rewards are refunded."
+                : offer.notice + " Unavailable ball rewards are refunded.") : offer.notice);
+        if (purchased > 1) result.setText("Won " + awarded + (category == Category.HULLMODS ? " blueprints" : category == Category.WEAPONS
+                ? " weapons" : " tokens") + "  |  " + completed + "/" + purchased + " balls landed"
+                + (refunded > 0 ? "  |  " + refunded + " tokens refunded" : ""));
         for (int i = 0; i < pocketLabels.size(); i++) {
             pocketLabels.get(i).setText(Integer.toString(offer.amount(i)));
             pocketLabels.get(i).setColor(offer.amount(i) == 0 ? DIM : Color.WHITE);
@@ -100,9 +118,13 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
         for (Btn button : buttons) {
             button.checked = button.action.equals("category:" + category.name());
             if (button.action.startsWith("category:")) button.enabled = !running();
-            else if (button.action.equals("drop")) {
-                button.label.setText("Drop ball - " + offer.cost + (offer.cost == 1 ? " token" : " tokens"));
-                button.enabled = !running() && offer.canBuy();
+            else if (button.action.startsWith("drop")) {
+                int count = batchSize(button.action);
+                long cost = (long) offer.cost * count;
+                button.label.setText(count + (count == 1 ? " ball - " : " balls - ")
+                        + cost + (cost == 1 ? " token" : " tokens"));
+                button.enabled = stockAvailable && offer.maximum() > 0 && TokenBank.getTokens() >= cost
+                        && pending + count <= PachinkoSwarm.MAX_PENDING;
             } else if (button.action.equals("skip")) button.enabled = running();
             else button.enabled = true;
             button.label.setColor(button.enabled ? Color.WHITE : DIM.darker());
@@ -115,23 +137,29 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
             finishOnDismissal();
             if (callbacks != null) callbacks.dismissDialog();
         } else if (action.equals("skip")) {
-            if (running()) { round.finish(); publish(); }
-        } else if (action.equals("drop")) {
-            if (running()) return;
-            PachinkoRound bought = PachinkoRound.buy(offer, random);
-            if (bought == null) {
+            if (running()) finishAll();
+        } else if (action.equals("drop") || action.equals("drop10") || action.equals("drop50")) {
+            int count = batchSize(action);
+            if (swarm.pending() + count > PachinkoSwarm.MAX_PENDING) return;
+            boolean live = running();
+            List<PachinkoRound> bought = PachinkoRound.buyBatch(offer, count, random, live);
+            if (bought.isEmpty() && !live) {
                 // A live slider edit or exhausted pool requires a fresh visible quote.
-                round = null; offer = PachinkoRound.offer(category);
+                clearRun(); offer = PachinkoRound.offer(category);
                 result.setText(offer.canBuy() ? "Pocket amounts or ball price updated." : "");
-            } else {
-                round = bought; published = false; result.setText("");
+            } else if (!bought.isEmpty()) {
+                if (!live) clearRun();
+                for (PachinkoRound ball : bought) { rounds.add(ball); swarm.add(ball.board); round = ball; }
+                purchased += bought.size();
                 Global.getSoundPlayer().playUISound("ui_chip_pickup", 1, 1);
             }
+            stockAvailable = PachinkoRound.stockAvailable(category);
             refresh();
         } else if (action.startsWith("category:") && !running()) {
             for (Category choice : Category.values()) {
                 if (!action.equals("category:" + choice.name()) || choice == category) continue;
-                category = choice; round = null; published = false;
+                category = choice; clearRun();
+                stockAvailable = PachinkoRound.stockAvailable(category);
                 offer = PachinkoRound.offer(category); result.setText(""); refresh();
                 break;
             }
@@ -139,20 +167,48 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
     }
 
     private void publish() {
-        if (round == null || !round.isSettled() || published) return;
-        published = true;
-        result.setText(round.getResult());
-        sessionLog.addAll(round.getLog());
-        boolean won = round.getResult().startsWith("Won ");
-        result.setColor(won ? category.color : DIM);
-        Global.getSoundPlayer().playUISound(won ? "ui_acquired_hullmod" : "ui_button_disabled_pressed", 1, .7f);
+        boolean changed = false, won = false;
+        for (java.util.Iterator<PachinkoRound> it = rounds.iterator(); it.hasNext();) {
+            PachinkoRound ball = it.next();
+            if (!ball.isSettled()) continue;
+            it.remove(); changed = true; completed++;
+            awarded += ball.getAwarded(); refunded += ball.getRefunded();
+            won |= ball.getAwarded() > 0;
+            sessionLog.addAll(ball.getLog());
+            lastLanded = ball.board;
+            if (ball.board.getPocket() >= 0) pocketGlow[ball.board.getPocket()] = 1;
+        }
+        swarm.retireFinished();
+        if (changed) {
+            if (purchased == 1) result.setText(round.getResult());
+            result.setColor(awarded > 0 ? category.color : DIM);
+            Global.getSoundPlayer().playUISound(won ? "ui_acquired_hullmod" : "ui_button_disabled_pressed", 1, .4f);
+            stockAvailable = PachinkoRound.stockAvailable(category);
+        }
         refresh();
+    }
+
+    private static int batchSize(String action) { return action.equals("drop50") ? 50 : action.equals("drop10") ? 10 : 1; }
+
+    private void clearRun() {
+        round = null; lastLanded = null;
+        rounds.clear(); swarm = new PachinkoSwarm();
+        purchased = completed = awarded = refunded = 0;
+        java.util.Arrays.fill(pocketGlow, 0);
+        result.setText("");
+        result.setColor(DIM);
+    }
+
+    private void settleBalls() { for (PachinkoRound ball : rounds) ball.settle(); }
+
+    private void finishAll() {
+        swarm.finish(this::settleBalls);
+        settleBalls(); publish();
     }
 
     public void finishOnDismissal() {
         if (dismissed) return;
-        if (running()) round.finish();
-        publish();
+        if (running()) finishAll();
         dismissed = true;
     }
 
@@ -178,7 +234,10 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
             if (scale > 0) pointer(Mouse.getX() / scale - position.getX(),
                     position.getY() + PANEL_H - Mouse.getY() / scale, Mouse.isButtonDown(0));
         }
-        if (running()) { round.advance(amount); publish(); }
+        if (Float.isFinite(amount) && amount > 0) {
+            for (int i = 0; i < pocketGlow.length; i++) pocketGlow[i] = Math.max(0, pocketGlow[i] - amount * 1.4f);
+        }
+        if (running()) { swarm.advance(amount, this::settleBalls); publish(); }
     }
 
     @Override public void processInput(List<InputEventAPI> events) {
@@ -187,7 +246,7 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
             if (event.isConsumed() || !event.isKeyDownEvent()) continue;
             if (event.getEventValue() == Keyboard.KEY_ESCAPE) { event.consume(); act("leave"); return; }
             if (event.getEventValue() == Keyboard.KEY_SPACE || event.getEventValue() == Keyboard.KEY_RETURN) {
-                event.consume(); act(running() ? "skip" : "drop");
+                event.consume(); act("drop");
             }
         }
     }
@@ -212,28 +271,31 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
             rect(BOARD_X, BOARD_Y, PachinkoBoard.WIDTH, PachinkoBoard.HEIGHT, BOARD, alpha);
             GLDraw.frame(x(BOARD_X - 4), y(BOARD_Y + PachinkoBoard.HEIGHT + 4),
                     PachinkoBoard.WIDTH + 8, PachinkoBoard.HEIGHT + 8, category.color, 2, alpha * .65f);
-            int landed = round == null ? -1 : round.board.getPocket();
+            int landed = lastLanded == null ? -1 : lastLanded.getPocket();
             for (int i = 0; i < PachinkoBoard.POCKETS; i++) {
                 float px = BOARD_X + i * PachinkoBoard.POCKET_WIDTH;
                 float top = BOARD_Y + PachinkoBoard.POCKET_TOP;
                 Color fill = offer.amount(i) == 0 ? new Color(22, 25, 32)
                         : GLDraw.darken(category.color, .78f - Math.abs(i - 5) * .07f);
-                if (i == landed) fill = GLDraw.brighten(fill, .28f);
+                float glow = Math.max(pocketGlow[i], !running() && i == landed ? 1 : 0);
+                if (glow > 0) fill = GLDraw.brighten(fill, .28f * glow);
                 rect(px + 1, top, PachinkoBoard.POCKET_WIDTH - 2, PachinkoBoard.HEIGHT - PachinkoBoard.POCKET_TOP, fill, alpha);
                 GLDraw.line(x(px), y(top), x(px), y(BOARD_Y + PachinkoBoard.FLOOR), DIM, 2, alpha * .6f);
-                if (i == landed) GLDraw.frame(x(px + 1), y(BOARD_Y + PachinkoBoard.HEIGHT),
-                        PachinkoBoard.POCKET_WIDTH - 2, PachinkoBoard.HEIGHT - PachinkoBoard.POCKET_TOP, GOLD, 2, alpha);
+                if (glow > 0) GLDraw.frame(x(px + 1), y(BOARD_Y + PachinkoBoard.HEIGHT),
+                        PachinkoBoard.POCKET_WIDTH - 2, PachinkoBoard.HEIGHT - PachinkoBoard.POCKET_TOP, GOLD, 2, alpha * glow);
             }
             for (PachinkoBoard.Peg peg : PachinkoBoard.pegs()) {
                 GLDraw.circle(x(BOARD_X + peg.x + 1), y(BOARD_Y + peg.y + 2), PachinkoBoard.PEG_RADIUS + 1, Color.BLACK, alpha * .5f, 10);
                 GLDraw.circle(x(BOARD_X + peg.x), y(BOARD_Y + peg.y), PachinkoBoard.PEG_RADIUS, DIM, alpha, 12);
                 GLDraw.circle(x(BOARD_X + peg.x - 1), y(BOARD_Y + peg.y - 1), 1.5f, Color.WHITE, alpha * .8f, 8);
             }
-            float bx = BOARD_X + (round == null ? PachinkoBoard.WIDTH / 2 : round.board.getX());
-            float by = BOARD_Y + (round == null ? 8 : round.board.getY());
-            GLDraw.circle(x(bx), y(by), PachinkoBoard.BALL_RADIUS + 2, category.color, alpha * .3f, 18);
-            GLDraw.circle(x(bx), y(by), PachinkoBoard.BALL_RADIUS, GOLD, alpha, 18);
-            GLDraw.circle(x(bx - 2), y(by - 2), 2, Color.WHITE, alpha, 10);
+            List<PachinkoBoard> visible = swarm.balls();
+            for (int i = 0; i < swarm.launched(); i++) {
+                PachinkoBoard ball = visible.get(i);
+                if (!ball.isFinished()) drawBall(ball.getX(), ball.getY(), alpha);
+            }
+            if (!running()) drawBall(lastLanded == null ? PachinkoBoard.WIDTH / 2 : lastLanded.getX(),
+                    lastLanded == null ? 8 : lastLanded.getY(), alpha);
             for (Btn button : buttons) {
                 Color fill = !button.enabled ? new Color(22, 26, 33) : button.checked
                         ? GLDraw.darken(category.color, .60f) : button.hovered ? new Color(55, 72, 88) : new Color(32, 43, 55);
@@ -242,5 +304,12 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
                         button.checked ? category.color : DIM, 1, alpha * (button.enabled ? .8f : .25f));
             }
         } finally { GL11.glPopAttrib(); }
+    }
+
+    private void drawBall(float bx, float by, float alpha) {
+        bx += BOARD_X; by += BOARD_Y;
+        GLDraw.circle(x(bx), y(by), PachinkoBoard.BALL_RADIUS + 2, category.color, alpha * .3f, 18);
+        GLDraw.circle(x(bx), y(by), PachinkoBoard.BALL_RADIUS, GOLD, alpha, 18);
+        GLDraw.circle(x(bx - 2), y(by - 2), 2, Color.WHITE, alpha, 10);
     }
 }
