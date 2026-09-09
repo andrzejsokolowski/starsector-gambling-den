@@ -23,7 +23,7 @@ public class Payout {
 
     // Crate entries contain item counts, not crate counts, so slider edits cannot change a win.
     private final Map<Prize, Integer> lots = new LinkedHashMap<Prize, Integer>();
-    private final int creditsPerMissingBlueprint = Math.max(0, Math.min(2000000, Config.CREDITS_PER_BLUEPRINT_OWED));
+    private final int creditsPerMissingBlueprint = Config.scaleCredits(Config.CREDITS_PER_BLUEPRINT_OWED);
     private Receipt granted;
 
     public void add(Prize prize, int amount) {
@@ -37,8 +37,8 @@ public class Payout {
     public void addUnits(Prize prize, long units) {
         if (granted != null) throw new IllegalStateException("Prize already collected");
         if (prize == null || !prize.pays() || units <= 0) return;
-        int room = prize.isCrate() ? MAX_ITEMS - getBlueprintCount() - getWeaponCount()
-                : MAX_MONEY - amountOf(prize);
+        int room = prize.isCrate() ? MAX_ITEMS - getBlueprintCount() - getWeaponCount() - getFighterCount()
+                : (prize == Prize.STORY_POINT ? 100 : MAX_MONEY) - amountOf(prize);
         lots.put(prize, amountOf(prize) + (int) Math.min(Math.max(0, room), units));
     }
 
@@ -48,8 +48,8 @@ public class Payout {
     }
 
     public boolean canDouble() {
-        if (granted != null || isEmpty()) return false;
-        long items = (long) getBlueprintCount() + getWeaponCount();
+        if (granted != null || isEmpty() || amountOf(Prize.STORY_POINT)>0) return false;
+        long items = (long) getBlueprintCount() + getWeaponCount() + getFighterCount();
         long potentialCredits = amountOf(Prize.CREDITS)
                 + (long) getBlueprintCount() * creditsPerMissingBlueprint;
         return items * 2 <= MAX_ITEMS && potentialCredits * 2 <= MAX_MONEY
@@ -63,16 +63,19 @@ public class Payout {
         return true;
     }
 
-    private int totalIn(boolean boxes) {
+    private int totalIn(int category) {
         int total = 0;
         for (Map.Entry<Prize, Integer> entry : lots.entrySet()) {
-            if (entry.getKey().isCrate() && entry.getKey().isBox() == boxes) total += entry.getValue();
+            Prize p=entry.getKey();
+            if (category==0 && p.isBox() || category==1 && p.isWeaponCrate()
+                    || category==2 && p.isFighterCrate()) total += entry.getValue();
         }
         return total;
     }
 
-    public int getBlueprintCount() { return totalIn(true); }
-    public int getWeaponCount() { return totalIn(false); }
+    public int getBlueprintCount() { return totalIn(0); }
+    public int getWeaponCount() { return totalIn(1); }
+    public int getFighterCount() { return totalIn(2); }
     private int amountOf(Prize prize) { return lots.getOrDefault(prize, 0); }
 
     /** Includes unavailable-blueprint substitutions before the player chooses to double. */
@@ -81,7 +84,7 @@ public class Payout {
         int promised = getBlueprintCount();
         int available = promised == 0 ? 0 : Math.min(promised, BlueprintPool.getEligible().size());
         long cash = amountOf(Prize.CREDITS) + (long) (promised - available) * creditsPerMissingBlueprint;
-        String description = describeAmounts(available, getWeaponCount(), Math.min(MAX_MONEY, cash), amountOf(Prize.TOKENS));
+        String description = describeAmounts(available, getWeaponCount(), getFighterCount(), Math.min(MAX_MONEY, cash), amountOf(Prize.TOKENS), amountOf(Prize.STORY_POINT));
         if (available < promised) description += " (" + (promised - available) + " unavailable blueprints paid in credits)";
         return description;
     }
@@ -119,6 +122,20 @@ public class Payout {
         }
         if (!weaponNames.isEmpty()) granted.lines.add(granted.weapons + " weapons: " + join(weaponNames));
 
+        List<String> fighterNames=new ArrayList<>();
+        var template=getFighterCount()>0?FighterPool.picker(random)
+                :new WeightedRandomPicker<com.fs.starfarer.api.loading.FighterWingSpecAPI>(random);
+        var fighterPicker=new WeightedRandomPicker<com.fs.starfarer.api.loading.FighterWingSpecAPI>(random);
+        for(int i=0;i<getFighterCount();i++) {
+            if(fighterPicker.isEmpty()) fighterPicker.addAll(template);
+            var wing=fighterPicker.pickAndRemove();
+            if(wing==null) break;
+            cargo.addFighters(wing.getId(),1);
+            granted.fighters++;
+            fighterNames.add(wing.getWingName());
+        }
+        if(!fighterNames.isEmpty()) granted.lines.add(granted.fighters+" fighter LPCs: "+join(fighterNames));
+
         int missing = getBlueprintCount() - granted.blueprints;
         granted.credits = Math.min(MAX_MONEY,
                 amountOf(Prize.CREDITS) + (long) missing * creditsPerMissingBlueprint);
@@ -129,26 +146,38 @@ public class Payout {
         }
         granted.tokens = TokenBank.addTokens(amountOf(Prize.TOKENS));
         if (granted.tokens > 0) granted.lines.add(granted.tokens + " tokens");
+        if(amountOf(Prize.STORY_POINT)>0) {
+            var stats=Global.getSector().getPlayerStats();
+            granted.storyPoints=Math.min(amountOf(Prize.STORY_POINT),Math.max(0,Integer.MAX_VALUE-stats.getStoryPoints()));
+            if(granted.storyPoints>0) {
+                stats.addStoryPoints(granted.storyPoints);
+                granted.lines.add(granted.storyPoints+(granted.storyPoints==1?" story point":" story points"));
+            }
+        }
         return granted;
     }
 
     public static final class Receipt {
-        private int blueprints, weapons, tokens;
+        private int blueprints, weapons, fighters, tokens, storyPoints;
         private long credits;
         private final List<String> lines = new ArrayList<String>();
 
         public int getBlueprints() { return blueprints; }
         public int getWeapons() { return weapons; }
+        public int getFighters() { return fighters; }
+        public int getStoryPoints() { return storyPoints; }
         public int getTokens() { return tokens; }
         public long getCredits() { return credits; }
         public List<String> getLines() { return new ArrayList<String>(lines); }
-        public String describe() { return describeAmounts(blueprints, weapons, credits, tokens); }
+        public String describe() { return describeAmounts(blueprints, weapons, fighters, credits, tokens, storyPoints); }
     }
 
-    private static String describeAmounts(int blueprints, int weapons, long credits, int tokens) {
+    private static String describeAmounts(int blueprints, int weapons, int fighters, long credits, int tokens, int storyPoints) {
         List<String> parts = new ArrayList<String>();
         if (blueprints > 0) parts.add(blueprints + (blueprints == 1 ? " hull mod blueprint" : " hull mod blueprints"));
         if (weapons > 0) parts.add(weapons + (weapons == 1 ? " weapon" : " weapons"));
+        if (fighters > 0) parts.add(fighters + (fighters == 1 ? " fighter LPC" : " fighter LPCs"));
+        if (storyPoints > 0) parts.add(storyPoints + (storyPoints == 1 ? " story point" : " story points"));
         if (credits > 0) parts.add(group(credits) + " credits");
         if (tokens > 0) parts.add(tokens + (tokens == 1 ? " token" : " tokens"));
         return parts.isEmpty() ? "nothing" : join(parts);

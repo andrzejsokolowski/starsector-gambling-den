@@ -34,6 +34,10 @@ public class RegressionChecks {
     private static final Map<String, Object> saved = new HashMap<>(), memory = new HashMap<>();
     private static final List<HullModSpecAPI> hullmods = new ArrayList<>();
     private static final List<WeaponSpecAPI> weapons = new ArrayList<>();
+    private static final List<FighterWingSpecAPI> fighterSpecs = new ArrayList<>();
+    private static final Map<String,Integer> specialItems = new HashMap<>(), commodities = new HashMap<>();
+    private static final Map<String,SpecialItemSpecAPI> specialSpecs = new HashMap<>();
+    private static int storyPoints;
     private static final List<FleetMemberAPI> fleet = new ArrayList<>();
     private static final Set<String> known = new HashSet<>(), chips = new HashSet<>();
     private static final Map<String, Integer> guns = new HashMap<>(), wings = new HashMap<>();
@@ -113,6 +117,7 @@ public class RegressionChecks {
         drawnIcons.clear(); labelCaptions.clear(); recordIcons=false;
         forbidRewards=false; hullScans=cargoScans=weaponRollSetup=weaponWrites=0;
         WeaponPool.clearCache();
+        FighterPool.clearCache(); fighterSpecs.clear(); specialItems.clear(); commodities.clear(); storyPoints=0;
     }
     private static void setup() {
         position = proxy(PositionAPI.class,(m,a) -> switch(m.getName()) {
@@ -134,7 +139,13 @@ public class RegressionChecks {
                 }));
                 yield stacks;
             }
-            case "addSpecial" -> { rewardWork(); check(chips.add(((SpecialItemData)a[0]).getData()),"Duplicate blueprint awarded"); yield null; }
+            case "addSpecial" -> {
+                rewardWork(); SpecialItemData item=(SpecialItemData)a[0];
+                if(item.getId().equals(Ids.MODSPEC)) check(chips.add(item.getData()),"Duplicate blueprint awarded");
+                else specialItems.merge(item.getId(),1,Integer::sum);
+                yield null;
+            }
+            case "addCommodity" -> { commodities.merge((String)a[0],((Number)a[1]).intValue(),Integer::sum); yield null; }
             case "addWeapons" -> { rewardWork(); weaponWrites++; guns.merge((String)a[0],(Integer)a[1],Integer::sum); yield null; }
             case "addFighters" -> { wings.merge((String)a[0],(Integer)a[1],Integer::sum); yield null; }
             case "removeItems" -> { chips.remove(((SpecialItemData)a[1]).getData()); yield null; }
@@ -157,6 +168,11 @@ public class RegressionChecks {
             default -> null;
         });
         Global.setSector(proxy(SectorAPI.class,(m,a)->switch(m.getName()) {
+            case "getPlayerStats" -> proxy(com.fs.starfarer.api.characters.MutableCharacterStatsAPI.class,(sm,sa)->switch(sm.getName()) {
+                case "getStoryPoints" -> storyPoints;
+                case "addStoryPoints" -> { storyPoints+=(Integer)sa[0];yield null; }
+                default -> null;
+            });
             case "getPersistentData" -> saved;
             case "getPlayerFleet" -> player;
             case "getPlayerFaction" -> faction;
@@ -166,6 +182,14 @@ public class RegressionChecks {
         Global.setSettings(proxy(SettingsAPI.class,(m,a)->switch(m.getName()) {
             case "getAllHullModSpecs" -> { rewardWork(); hullScans++; yield new ArrayList<>(hullmods); }
             case "getAllWeaponSpecs" -> { rewardWork(); yield new ArrayList<>(weapons); }
+            case "getAllFighterWingSpecs" -> new ArrayList<>(fighterSpecs);
+            case "getSpecialItemSpec" -> specialSpecs.get(a[0]);
+            case "getCommoditySpec" -> proxy(com.fs.starfarer.api.campaign.econ.CommoditySpecAPI.class,(sm,sa)->switch(sm.getName()) {
+                case "getId","getName" -> a[0];
+                case "getIconName" -> "graphics/icons/cargo/"+a[0]+".png";
+                default -> null;
+            });
+            case "getMergedJSONForMod" -> readJson((String)a[0]);
             case "getAllBarEventSpecs" -> new ArrayList<>();
             case "getHullModSpec" -> hullmods.stream().filter(s->s.getId().equals(a[0])).findFirst().orElse(null);
             case "getScreenScaleMult" -> 1f;
@@ -210,14 +234,14 @@ public class RegressionChecks {
         hullmods.add(hullmod("known",1)); known.add("known");
         hullmods.add(hullmod("held",1)); chips.add("held");
         Payout box=new Payout(); box.add(Prize.BOX_LARGE,1);
-        check(box.describe().contains("2 hull mod blueprints") && box.describe().contains("160,000 credits"),"Partial exhaustion preview");
+        check(box.describe().contains("2 hull mod blueprints") && box.describe().contains("40,000 credits"),"Partial exhaustion preview");
         var receipt=box.grant(new Random(1));
-        check(receipt.getBlueprints()==2 && receipt.getCredits()==160000,"Partial exhaustion receipt");
-        check(credits==160000 && chips.size()==3,"Actual cargo differs from receipt");
-        box.grant(new Random(1)); check(credits==160000,"Prize paid twice");
+        check(receipt.getBlueprints()==2 && receipt.getCredits()==40000,"Partial exhaustion receipt");
+        check(credits==40000 && chips.size()==3,"Actual cargo differs from receipt");
+        box.grant(new Random(1)); check(credits==40000,"Prize paid twice");
         check(BlueprintPool.isExhausted(),"Zero rarity/no-drop/known/held exclusion");
         Payout emptyBox=new Payout(); emptyBox.add(Prize.BOX_SMALL,1);
-        check(emptyBox.describe().contains("60,000 credits"),"Exhausted box preview");
+        check(emptyBox.describe().contains("15,000 credits"),"Exhausted box preview");
         check(emptyBox.grant(new Random(1)).getBlueprints()==0,"Exhausted box awarded a blueprint");
 
         weapons.add(weapon("normal",1,false)); weapons.add(weapon("fighter",1,true));
@@ -390,6 +414,7 @@ public class RegressionChecks {
                 reset(); recordIcons=true; saved.put(Ids.KEY_TOKENS,10000);
                 for(int i=0;i<100;i++) hullmods.add(hullmod("display"+i,1));
                 weapons.add(weapon("displayWeapon",1,false));
+                fighterSpecs.add(fighter("displayWing",1));
                 SlotMachinePanel panel=machine();
                 invoke(panel,"act",String.class,"reels:"+count);
                 invoke(panel,"act",String.class,"stake:"+stake);
@@ -430,6 +455,7 @@ public class RegressionChecks {
                     var receipt=payout.grant(new Random(1));
                     check(((LabelAPI)get(panel,"resultLabel")).getText().equals("Collected: "+receipt.describe()+"."),"Collected text differs from receipt");
                     check(chips.size()==receipt.getBlueprints() && guns.getOrDefault("displayWeapon",0)==receipt.getWeapons()
+                            && wings.getOrDefault("displayWing",0)==receipt.getFighters() && storyPoints==receipt.getStoryPoints()
                             && credits==receipt.getCredits(),"Cargo differs from displayed receipt");
                     check(TokenBank.getTokens()==10000-SlotMachine.costOf(count,stake)+receipt.getTokens(),"Token cost or reward differs from the selected stake");
                 }
@@ -462,6 +488,7 @@ public class RegressionChecks {
         Method method=instance.getClass().getDeclaredMethod(name,types); method.setAccessible(true); method.invoke(instance,args);
     }
     private static void odds() {
+        reset(); fighterSpecs.add(fighter("oddsWing",1));
         double[] expected={.0192,.048,.0832,.128};
         for(int stake=0;stake<Config.STAKE_COUNT;stake++) {
             Random random=new Random(30+stake); int boxes=0; int count=100000;
@@ -854,7 +881,7 @@ public class RegressionChecks {
         check(game.hands().isEmpty() && ((LabelAPI)get(panel,"result")).getText().isEmpty(),"Bet change retained stale result");
         BlackjackChecks.rig(game,10,6,2,10,4,10); invoke(panel,"act",String.class,"deal");
         Object[][] faces=(Object[][])get(panel,"faces");
-        check((Boolean)get(faces[0][1],"hidden") && ((LabelAPI)get(faces[0][1],"rank")).getText().isEmpty(),"Dealer hole card leaked");
+        check((Boolean)get(faces[0][1],"hidden") && ((String)get(faces[0][1],"rankText")).isEmpty(),"Dealer hole card leaked");
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{265f,625f,false});
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{265f,625f,true});
         check(game.hands().get(0).cards().size()==3,"Blackjack Hit mouse button failed");
@@ -862,7 +889,7 @@ public class RegressionChecks {
         invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{425f,625f,true});
         for(int frame=0;frame<200;frame++) panel.advance(1f/60);
         check(TokenBank.getTokens()==142 && !(Boolean)get(faces[0][1],"hidden")
-                && !((LabelAPI)get(faces[0][1],"rank")).getText().isEmpty(),"Stand mouse button/dealer reveal failed");
+                && !((String)get(faces[0][1],"rankText")).isEmpty(),"Stand mouse button/dealer reveal failed");
     }
 
     @SuppressWarnings("unchecked")
@@ -947,13 +974,172 @@ public class RegressionChecks {
         }
     }
 
+    private static org.json.JSONObject readJson(String path) throws Exception {
+        return new org.json.JSONObject(String.join("\n",java.nio.file.Files.readAllLines(java.nio.file.Path.of(path))
+                .stream().filter(line->!line.stripLeading().startsWith("#")).toList()));
+    }
+    private static FighterWingSpecAPI fighter(String id,float rarity,String... tags) {
+        return proxy(FighterWingSpecAPI.class,(m,a)->switch(m.getName()) {
+            case "getId","getWingName" -> id;
+            case "getBaseValue" -> 1000f;
+            case "getRarity" -> rarity;
+            case "hasTag" -> Arrays.asList(tags).contains(a[0]);
+            default -> null;
+        });
+    }
+    private static void expandedRewards() throws Exception {
+        reset();
+        for(int i=0;i<8;i++) fighterSpecs.add(fighter("wing"+i,1));
+        for(String tag:List.of(Tags.NO_DROP,Tags.RESTRICTED,"no_drop_salvage","no_sell","mission_item"))
+            fighterSpecs.add(fighter(tag,1000,tag));
+        fighterSpecs.add(fighter("zero",0)); fighterSpecs.add(fighter("nan",Float.NaN));
+        for(int seed=0;seed<100;seed++) {
+            wings.clear(); Payout crate=new Payout(); crate.add(Prize.FIGHTERS_LARGE,1);
+            check(crate.getWeaponCount()==0 && crate.getFighterCount()==4,"Fighters mixed with weapons");
+            var receipt=crate.grant(new Random(seed));
+            check(wings.size()==4 && wings.values().stream().allMatch(n->n==1),"Fighter crate repeated a wing despite sufficient stock");
+            check(wings.keySet().stream().allMatch(id->id.startsWith("wing")),"Invalid fighter LPC awarded");
+            check(receipt.getFighters()==4 && receipt.describe().contains("4 fighter LPCs"),"Fighter receipt mismatch");
+            crate.grant(new Random(0));check(wings.size()==4 && wings.values().stream().allMatch(n->n==1),"Fighter prize paid twice");
+        }
+        Payout sp=new Payout();sp.add(Prize.STORY_POINT,1);
+        check(!sp.canDouble() && !sp.doubleUp(),"Story points can be doubled");
+        check(sp.describe().equals("1 story point"),"Story-point preview mismatch");
+        check(sp.grant(new Random(0)).getStoryPoints()==1 && storyPoints==1,"Story point not awarded");
+        sp.grant(new Random(0));check(storyPoints==1,"Story point awarded twice");
+        storyPoints=Integer.MAX_VALUE-1;Payout cap=new Payout();cap.add(Prize.STORY_POINT,5);
+        check(cap.grant(new Random(0)).getStoryPoints()==1 && storyPoints==Integer.MAX_VALUE,"Story point overflow");
+        for(int stake=0;stake<3;stake++) for(int spin=0;spin<1000;spin++)
+            check(!SlotMachine.pull(5,stake,new Random(spin)).symbols.contains(Prize.STORY_POINT),"Story point below 8-token stakes");
+        int stories=0;
+        Random random=new Random(562);
+        for(int spin=0;spin<100000;spin++) if(SlotMachine.pull(1,3,random).symbols.get(0)==Prize.STORY_POINT) stories++;
+        check(stories>110 && stories<220,"Story-point rate is not rare or never pays: "+stories);
+        float oldHit=Config.HIT_CHANCE[3];var oldWeights=Config.WEIGHTS[3];
+        try {
+            Config.HIT_CHANCE[3]=1;Config.WEIGHTS[3]=new HashMap<>(Map.of(Prize.STORY_POINT,1f));
+            var result=SlotMachine.pull(3,3,new Random(1));
+            check(!result.fullHouse && !result.payout.canDouble() && result.payout.describe().equals("3 story points"),
+                    "All-story reels automatically doubled or lied about doubling");
+        } finally { Config.HIT_CHANCE[3]=oldHit;Config.WEIGHTS[3]=oldWeights; }
+        int[] expected={2000,6250,15000,30000};
+        for(int i=0;i<4;i++) check(Config.creditsPaid(i)==expected[i],"Credits not cut to one quarter");
+        var loader=lunalib.backend.ui.settings.LunaSettingsLoader.INSTANCE;
+        boolean loaded=loader.getHasLoaded();var previous=lunalib.backend.ui.settings.LunaSettingsLoader.getSettings();
+        var settings=new org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject("unused-test-settings");
+        try {
+            loader.setHasLoaded(true);
+            lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
+            settings.put("gd_credits_max",120000);
+            check(Config.creditsPaid(3)==30000,"Saved old Luna value defeated credit reduction");
+            settings.put("gd_credit_percent",50);check(Config.creditsPaid(3)==60000,"Credit slider ignored");
+            settings.put("gd_hit_max",Math.round(Config.HIT_CHANCE[3]*100));
+            settings.put("gd_tokens_max",Config.TOKENS_PAID[3]);
+            for(Prize prize:Prize.values()) if(prize.isCrate()) settings.put("gd_count_"+prize.id,prize.count);
+            settings.put("gd_credit_percent",0);check(Config.creditsPaid(3)==0,"Zero-credit setting ignored");
+            check(!SlotMachine.stripFor(3).contains(Prize.CREDITS),"Disabled cash still appears on the strip");
+            for(int spin=0;spin<1000;spin++) check(!SlotMachine.pull(5,3,new Random(spin)).symbols.contains(Prize.CREDITS),
+                    "Cash icon shown for a disabled credit reward");
+        } finally { lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous);loader.setHasLoaded(loaded); }
+    }
+    private static void jackpotDefaults() throws Exception {
+        var json=readJson(gamblingden.jackpot.JackpotGame.CONFIG_PATH);
+        var rows=json.getJSONArray("rewards");specialSpecs.clear();
+        for(int i=0;i<rows.length();i++) {
+            var row=rows.getJSONObject(i);String id=row.getString("id");
+            if(row.optString("kind","special").equals("special")) specialSpecs.put(id,proxy(SpecialItemSpecAPI.class,(m,a)->switch(m.getName()) {
+                case "getId" -> id;
+                case "getName" -> id.replace('_',' ');
+                case "getIconName" -> "graphics/icons/cargo/"+id+".png";
+                default -> null;
+            }));
+        }
+        gamblingden.jackpot.JackpotGame.clearCache();
+        check(gamblingden.jackpot.JackpotGame.pool(8).size()==17,"Default jackpot list missing items");
+    }
+    private static void jackpot() throws Exception {
+        reset();jackpotDefaults();
+        for(int stake:new int[]{2,4,8}) {
+            var pool=gamblingden.jackpot.JackpotGame.pool(stake);
+            check(pool.stream().anyMatch(r->r.id().equals("gamma_core")),"Gamma core missing");
+            check(pool.stream().anyMatch(r->r.id().equals("beta_core"))==(stake>=4),"Beta stake gate");
+            check(pool.stream().anyMatch(r->r.id().equals("alpha_core"))==(stake>=8),"Alpha stake gate");
+            check(pool.stream().allMatch(r->r.minStake()<=stake),"Locked item in jackpot pool");
+            saved.put(Ids.KEY_TOKENS,10000000);
+            int wins=0,draws=100000;Random random=new Random(stake);
+            for(int spin=0;spin<draws;spin++) {
+                var round=gamblingden.jackpot.JackpotGame.buy(stake,random);
+                check(round!=null && round.symbols.size()==3,"Valid jackpot pull failed");
+                var first=round.symbols.get(0);
+                boolean match=first!=null && round.symbols.stream().allMatch(r->r!=null && r.id().equals(first.id()));
+                check((round.winner()!=null)==match,"Nonmatching jackpot won");
+                int before=specialItems.values().stream().mapToInt(n->n).sum()+commodities.values().stream().mapToInt(n->n).sum();
+                String result=round.finish();round.finish();
+                int after=specialItems.values().stream().mapToInt(n->n).sum()+commodities.values().stream().mapToInt(n->n).sum();
+                check(after-before==(match?1:0),"Jackpot paid more than one item or paid on a mismatch");
+                if(match) { wins++;check(result.equals("Collected: 1 "+first.name()+"."),"Jackpot receipt differs from symbol"); }
+            }
+            double expected=gamblingden.jackpot.JackpotGame.matchChance(stake);
+            check(Math.abs((double)wins/draws-expected)<.001,"Independent match odds differ from display");
+            check(TokenBank.getTokens()==10000000-draws*stake*3,"Jackpot charged wrong cost");
+            System.out.printf("Relic Jackpot: %d per reel, %.3f%% expected, %.3f%% observed%n",stake,100*expected,100d*wins/draws);
+        }
+        saved.put(Ids.KEY_TOKENS,5);
+        check(gamblingden.jackpot.JackpotGame.buy(2,new Random())==null && TokenBank.getTokens()==5,"Unaffordable jackpot charged");
+        specialSpecs.put("mission_reward",proxy(SpecialItemSpecAPI.class,(m,a)->m.getName().equals("hasTag") && a[0].equals("mission_item")));
+        var custom=new org.json.JSONObject("{'symbolChance':1,'rewards':[{'id':'missing'},{'id':'soil_nanites'},"
+                +"{'id':'mission_reward'},{'id':'soil_nanites'},{'kind':'commodity','id':'alpha_core','minStake':2},{'kind':'commodity','id':'fuel'}]}");
+        Method load=gamblingden.jackpot.JackpotGame.class.getDeclaredMethod("load",org.json.JSONObject.class);load.setAccessible(true);load.invoke(null,custom);
+        check(gamblingden.jackpot.JackpotGame.pool(2).size()==1 && gamblingden.jackpot.JackpotGame.pool(8).size()==2,
+                "Missing/duplicate/ordinary item or unlocked alpha entered custom list");
+        for(String close:List.of("skip","leave","escape","external","animated")) {
+            reset();recordIcons=true;TokenBank.addTokens(100);
+            var panel=(gamblingden.jackpot.JackpotPanel)machine(gamblingden.jackpot.JackpotPanel.class);
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,620f,true});
+            check(TokenBank.getTokens()==94 && (Boolean)get(panel,"spinning"),"Jackpot mouse Pull failed");
+            invoke(panel,"act",String.class,"stake:8");check((Integer)get(panel,"stake")==2,"Jackpot stake changed mid-spin");
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{320f,620f,true});
+            check(TokenBank.getTokens()==94,"Held mouse bought two pulls");
+            if(close.equals("skip")) {
+                invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{510f,620f,false});
+                invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{510f,620f,true});
+            } else if(close.equals("leave")) {
+                invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{700f,620f,false});
+                invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{700f,620f,true});
+            } else if(close.equals("escape")) panel.processInput(List.of(key(Keyboard.KEY_ESCAPE)));
+            else if(close.equals("external")) {
+                int[] callbacks={0};var delegate=new gamblingden.jackpot.JackpotDialogDelegate(panel,()->callbacks[0]++);
+                delegate.reportDismissed(0);delegate.reportDismissed(0);check(callbacks[0]==1,"Jackpot close callback repeated");
+            } else for(int frame=0;frame<300;frame++) panel.advance(1f/60);
+            check(!(Boolean)get(panel,"spinning") && specialItems.get("soil_nanites")==1,"Exit/skip failed to collect one match: "+close);
+            check(((LabelAPI)get(panel,"result")).getText().equals("Collected: 1 soil nanites."),"Jackpot screen receipt mismatch");
+            Pbuffer buffer=new Pbuffer(1200,800,new PixelFormat(),null);
+            try {
+                buffer.makeCurrent();drawnIcons.clear();panel.renderBelow(1);
+                check(drawnIcons.size()==3 && drawnIcons.stream().allMatch(icon->icon.path().equals("graphics/icons/cargo/soil_nanites.png")),
+                        "Jackpot icons differ from actual collected item");
+            } finally { buffer.destroy(); }
+            if(close.equals("skip") || close.equals("animated")) {
+                invoke(panel,"act",String.class,"stake:4");
+                check(((LabelAPI)get(panel,"result")).getText().isEmpty() && get(panel,"round")==null,"New jackpot stake retains stale prize");
+                int checked=0;
+                for(Object b:(List<?>)get(panel,"buttons")) if((Boolean)get(b,"checked")) checked++;
+                check(checked==1,"Jackpot stakes not exclusive");
+            }
+            panel.finishOnDismissal();check(specialItems.get("soil_nanites")==1,"Jackpot exit paid twice");
+        }
+        load.invoke(null,new org.json.JSONObject("{'rewards':[]}"));
+        check(gamblingden.jackpot.JackpotGame.buy(2,new Random())==null,"Empty jackpot pool accepted payment");
+        jackpotDefaults();recordIcons=false;
+    }
+
     public static void main(String[] args) throws Exception {
         if(args.length>0 && args[0].equals("fast-renderer")) {
             setup(); FastRendererChecks.run(RegressionChecks::machine); return;
         }
         setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
         PachinkoPhysicsChecks.run(); PachinkoPhysicsChecks.multiBall(); pachinko(); pachinkoSettings(); pachinkoBatches();
-        BlackjackChecks.run(); blackjackUI();
+        BlackjackChecks.run(); blackjackUI(); expandedRewards(); jackpot();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }

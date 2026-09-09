@@ -132,6 +132,30 @@ final class FastRendererChecks {
                 drain(exec,swap); update.invoke(detector);
             }
 
+            Class<?> jackpotType=new BridgeLoader().loadClass("gamblingden.jackpot.JackpotPanel");
+            BaseCustomUIPanelPlugin jackpot=factory.create(jackpotType);
+            Method jackpotAct=jackpotType.getDeclaredMethod("act",String.class);jackpotAct.setAccessible(true);
+            gamblingden.economy.TokenBank.addTokens(1000);
+            for(int frame=0;frame<600;frame++) {
+                if(frame%150==0) jackpotAct.invoke(jackpot,"pull");
+                if(frame%150==50) jackpotAct.invoke(jackpot,"skip");
+                jackpot.advance(1f/60);
+                boolean clipped=frame%2==0;
+                enqueue.invoke(exec,(Runnable)()->{
+                    if(clipped) GL11.glEnable(GL11.GL_SCISSOR_TEST);else GL11.glDisable(GL11.GL_SCISSOR_TEST);
+                    GL11.glScissor(15,20,1100,700);
+                });
+                jackpot.renderBelow(1f);
+                if(stalled.getBoolean(detector)) throw new AssertionError("Relic Jackpot forced a pipeline stall");
+                enqueue.invoke(exec,(Runnable)()->{
+                    IntBuffer rect=BufferUtils.createIntBuffer(16);GL11.glGetInteger(GL11.GL_SCISSOR_BOX,rect);
+                    if(GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)!=clipped || rect.get(0)!=15 || rect.get(1)!=20
+                            || rect.get(2)!=1100 || rect.get(3)!=700) throw new AssertionError("Jackpot clipping leaked");
+                    if(GL11.glGetError()!=GL11.GL_NO_ERROR) throw new AssertionError("Jackpot OpenGL error");
+                });
+                drain(exec,swap);update.invoke(detector);
+            }
+
             // Positive control: the exact v0.4.2 query must reproduce the reported fatal
             // exception. Otherwise this harness is not actually testing the failing path.
             Class<?> bridge=Class.forName("com.genir.renderer.bridge.GL11");
@@ -146,7 +170,7 @@ final class FastRendererChecks {
                 update.invoke(detector);
             }
             if(!reproduced) throw new AssertionError("Old crash condition was not reproduced");
-            System.out.println("PASS: Fast Rendering bridge: 1800 panel frames (600 per game) without stalls or clipping leaks; v0.4.2 crash reproduced by control.");
+            System.out.println("PASS: Fast Rendering bridge: 2400 panel frames (600 per game) without stalls or clipping leaks; v0.4.2 crash reproduced by control.");
         } finally {
             try {
                 enqueue.invoke(exec,(Runnable)()->{
@@ -174,6 +198,7 @@ final class FastRendererChecks {
             if(!name.equals("gamblingden.slots.SlotMachinePanel") && !name.startsWith("gamblingden.slots.SlotMachinePanel$")
                     && !name.startsWith("gamblingden.pachinko.")
                     && !name.startsWith("gamblingden.blackjack.")
+                    && !name.startsWith("gamblingden.jackpot.")
                     && !name.equals("gamblingden.ui.GLDraw")) return super.loadClass(name,resolve);
             Class<?> loaded=findLoadedClass(name);
             if(loaded==null) {

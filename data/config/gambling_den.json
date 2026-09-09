@@ -27,22 +27,27 @@
 	# Relative prize weights once a reel wins. Higher stakes also unlock bigger crates.
 	"weightsLow": {
 		"tokens": 34, "credits": 24,
-		"weapons_small": 24, "weapons_medium": 6, "weapons_large": 0,
+		"weapons_small": 20, "weapons_medium": 4, "weapons_large": 0,
+		"fighters_small": 4, "fighters_medium": 2, "fighters_large": 0,
 		"box_small": 12, "box_medium": 0, "box_large": 0
 	},
 	"weightsMid": {
 		"tokens": 30, "credits": 18,
-		"weapons_small": 14, "weapons_medium": 12, "weapons_large": 2,
+		"weapons_small": 10, "weapons_medium": 10, "weapons_large": 0,
+		"fighters_small": 4, "fighters_medium": 2, "fighters_large": 2,
 		"box_small": 15, "box_medium": 9, "box_large": 0
 	},
 	"weightsHigh": {
 		"tokens": 26, "credits": 14,
-		"weapons_small": 6, "weapons_medium": 14, "weapons_large": 8,
+		"weapons_small": 2, "weapons_medium": 12, "weapons_large": 6,
+		"fighters_small": 4, "fighters_medium": 2, "fighters_large": 2,
 		"box_small": 11, "box_medium": 14, "box_large": 7
 	},
 	"weightsMax": {
 		"tokens": 22, "credits": 10,
-		"weapons_small": 4, "weapons_medium": 12, "weapons_large": 12,
+		"weapons_small": 0, "weapons_medium": 10, "weapons_large": 10,
+		"fighters_small": 4, "fighters_medium": 2, "fighters_large": 2,
+		"story_point": 0.5,
 		"box_small": 10, "box_medium": 16, "box_large": 14
 	},
 
@@ -50,8 +55,10 @@
 	# Fallbacks for the sliders, used if LunaLib is not answering.
 	"crateContents": {
 		"box_small": 3, "box_medium": 6, "box_large": 10,
-		"weapons_small": 2, "weapons_medium": 5, "weapons_large": 12
+		"weapons_small": 2, "weapons_medium": 5, "weapons_large": 12,
+		"fighters_small": 1, "fighters_medium": 2, "fighters_large": 4
 	},
+	# Base values before the LunaLib credit percentage (25% by default).
 	"creditsPaid": [8000, 25000, 60000, 120000],
 	"tokensPaid": [8, 20, 45, 90],
 

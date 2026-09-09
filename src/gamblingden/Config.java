@@ -69,6 +69,13 @@ public class Config {
             for (int i = 0; i < paying.length; i++) {
                 out[stake].put(paying[i], rows[stake][i]);
             }
+            out[stake].put(Prize.WEAPONS_SMALL, Math.max(0, rows[stake][2]-4));
+            out[stake].put(Prize.FIGHTERS_SMALL, 4f);
+            out[stake].put(Prize.WEAPONS_MEDIUM, Math.max(0, rows[stake][3]-2));
+            out[stake].put(Prize.FIGHTERS_MEDIUM, 2f);
+            out[stake].put(Prize.WEAPONS_LARGE, Math.max(0, rows[stake][4]-2));
+            out[stake].put(Prize.FIGHTERS_LARGE, stake==0?0f:2f);
+            out[stake].put(Prize.STORY_POINT, stake==3?.5f:0f);
         }
         return out;
     }
@@ -88,8 +95,14 @@ public class Config {
 
     public static int creditsPaid(int stake) {
         Integer set = luna("gd_credits_" + stakeName(stake).toLowerCase());
-        if (set != null && set > 0) return set;
-        return CREDITS_PAID[stake];
+        return scaleCredits(set != null && set > 0 ? set : CREDITS_PAID[stake]);
+    }
+
+    /** New multiplier also applies to the player's previously saved LunaLib payout values. */
+    public static int scaleCredits(int base) {
+        Integer percent=luna("gd_credit_percent");
+        int bounded=Math.max(0,Math.min(100,percent==null?25:percent));
+        return (int)Math.min(2000000,Math.max(0L,(long)base)*bounded/100);
     }
 
     public static int tokensPaid(int stake) {

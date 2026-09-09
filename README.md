@@ -1,12 +1,12 @@
 # Gambling Den
 
 A back-room gambling den at every port of size 6 or more. Sell surplus hulls for tokens,
-then play Slots, Pachinko, or Blackjack for hullmod blueprints, weapons, tokens, and more.
+then play Slots, Pachinko, Blackjack, or Relic Jackpot.
 
 Gathering hull mods from salvage is slow. This gives you something else to do with the pile of
 recovered frigates you are never going to fly.
 
-Gambling Den is the venue, not the name of a machine. Slots, Pachinko, and Blackjack share the den
+Gambling Den is the venue, not the name of a machine. All four games share the den
 and token balance, with their own rules. Poker is planned for a later update.
 
 ## How it works
@@ -32,16 +32,22 @@ larger prizes on the strip and raises the chance that an individual reel pays.
 
 **Pull.** Every reel is rolled and paid on its own — nothing has to line up. Most reels bust,
 the way a slot machine is supposed to; the ones that do not are worth having. Match every reel
-and the whole payout doubles.
+across two or more reels and the whole payout doubles, unless it contains story points.
 
-**What comes out.** Credits, more tokens so you can keep going, weapon crates in three sizes, and
-hull mod boxes in three sizes — a large box is ten blueprints handed over at once.
+Prizes include credits, tokens, weapon crates, fighter crates, and hullmod boxes.
+A large hullmod box holds ten blueprints by default. Fighter crates hold 1, 2, or 4 fighter LPCs,
+items that equip a carrier with fighter wings. Each LPC gets its own weighted random draw.
+Fighter rewards avoid repeats until every eligible wing appears. Built-in, restricted, mission,
+no-drop, and no-sell wings are excluded.
+
+At 8 tokens per reel, a rare symbol pays one story point. Its default chance is about 0.16% per reel.
+A payout that contains story points cannot be doubled, automatically or with Double or nothing.
 
 **It never gives you a duplicate.** Boxes skip anything you already know and anything you are
 already carrying a chip for, including within the same box. If the machine has run out of hull
 mods you do not know, a box settles up in cash instead.
 
-**Double or nothing.** Win anything and you can risk the whole payout on one more roll. Slightly
+**Double or nothing.** Win a prize without story points and you can risk the whole payout on one more roll. Slightly
 worse than even odds, because of course it is.
 
 Doubling stops before a prize can exceed 1 billion credits/tokens or 10,000 items. Closing the
@@ -118,7 +124,33 @@ Winnings enter the token balance when the round ends. During a round, the exit b
 Stand & leave. That button, Escape, and an external closure stand on unfinished hands and resolve
 the dealer once. Leaving cannot cancel a paid bet or collect it twice.
 
+## Relic Jackpot
+
+This separate machine always has three reels. Stakes are 2, 4, or 8 tokens per reel,
+so a pull costs 6, 12, or 24 tokens. Three copies of the same item on the middle row
+award exactly one item. Blanks and mismatches pay nothing. There are no refunds, pity wins,
+consolation credits, or doubling. Closing or skipping finishes the paid spin and collects its result once.
+
+Gamma cores enter at 2 tokens per reel, beta cores at 4, and alpha cores at 8.
+Higher stakes keep earlier rewards and add more colony items.
+The default list contains fourteen colony items and three AI core grades.
+Mission items are not included. Each reel rolls independently.
+The default chance of any match is about 1.71% / 0.43% / 0.23%.
+Higher stakes unlock rarer items, not a higher win rate. The screen shows the current match chance.
+
+Edit `data/config/jackpot_rewards.json` to change the dedicated reward list, item weights, minimum stakes, and blank chance.
+Use special-item IDs from the installed game or mods. Optional `data` identifies a parameterized special item.
+Missing, mission, restricted, and no-drop items are skipped. Only AI cores can use the commodity entry type.
+The core stake gates still apply if the list gives a lower minimum.
+Reload a save after edits. Empty lists disable purchases.
+
 ## Tuning
+
+The Credit payout percentage slider defaults to 25%. It applies to the base credit amounts,
+including values saved before this update, and cash for unavailable blueprints.
+Default credit symbols now pay 2,000 / 6,250 / 15,000 / 30,000 before random variance.
+Unavailable blueprints pay 5,000 credits each by default. Already-won prizes keep their value.
+Fighter crate sizes have their own sliders, from 1 to 100 LPCs.
 
 **LunaLib settings page**, adjustable with sliders while the game is running: how many blueprints
 are in each size of hull mod box, how many weapons in each size of crate (1 to 100 either way),
@@ -150,9 +182,27 @@ offscreen graphics; they do not open or change a live game. The graphics checks 
 game's Windows native libraries. Run `./gradlew releaseZip` to check, build and package the mod
 with both icon sizes into `GamblingDen.zip`.
 
-If `fr.jar` is installed in `starsector-core`, the checks also send 1,800 panel frames through
+If `fr.jar` is installed in `starsector-core`, the checks also send 2,400 panel frames through
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
+
+## Changes in 1.3.0
+
+Blackjack ranks use larger vector strokes without the shadow from the small interface font.
+The user confirmed that blackjack gameplay works. Card rules and payouts do not change.
+
+Slots add fighter crates and rare story points at 8-token stakes.
+Story-point payouts cannot be doubled. Fighter crate sizes have LunaLib sliders.
+Credit symbols and cash for unavailable blueprints now pay one quarter of their old amounts by default.
+The new percentage slider also applies to previously saved credit values.
+
+Relic Jackpot adds a separate three-match machine with a dedicated list of colony items and AI cores.
+It pays one item per match, with no consolation payouts or doubling.
+The token-to-ship converter remains a proposal and is not included.
+
+Tests cover 300,000 jackpot pulls, exact icon-to-reward agreement, cargo awards, mouse buttons, safe exits, fighter variety, and story-point gates.
+The existing blackjack and Pachinko checks still pass. All four games pass the Fast Rendering test.
+The new visuals and rewards still need an in-game test.
 
 ## Changes in 1.2.0
 

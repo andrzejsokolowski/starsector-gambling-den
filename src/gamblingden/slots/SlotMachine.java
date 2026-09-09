@@ -10,6 +10,7 @@ import com.fs.starfarer.api.util.WeightedRandomPicker;
 import gamblingden.Config;
 import gamblingden.prizes.Payout;
 import gamblingden.prizes.Prize;
+import gamblingden.prizes.FighterPool;
 
 /**
  * The machine's insides.
@@ -48,7 +49,7 @@ public class SlotMachine {
         Map<Prize, Float> weights = Config.WEIGHTS[clampStake(stake)];
         for (Prize prize : Prize.values()) {
             Float weight = weights.get(prize);
-            if (weight != null && weight > 0f) out.add(prize);
+            if (weight != null && weight > 0f && allowed(prize, clampStake(stake))) out.add(prize);
         }
         return out;
     }
@@ -77,7 +78,7 @@ public class SlotMachine {
                 }
             }
         }
-        if (fullHouse) payout.doubleUp();
+        if (fullHouse) fullHouse = payout.doubleUp();
 
         return new SpinResult(symbols, payout, fullHouse);
     }
@@ -89,7 +90,7 @@ public class SlotMachine {
         Map<Prize, Float> weights = Config.WEIGHTS[stake];
         WeightedRandomPicker<Prize> picker = new WeightedRandomPicker<Prize>(random);
         for (Prize prize : Prize.values()) {
-            if (!prize.pays()) continue;
+            if (!prize.pays() || !allowed(prize, stake)) continue;
             Float weight = weights.get(prize);
             if (weight != null && weight > 0f) picker.add(prize, weight);
         }
@@ -102,13 +103,19 @@ public class SlotMachine {
      * sliders. Cash and tokens pay a size that wobbles a bit either way.
      */
     private static int amountFor(Prize prize, int stake, Random random) {
-        if (prize.isCrate()) return 1;
+        if (prize.isCrate() || prize == Prize.STORY_POINT) return 1;
 
         int base = prize == Prize.TOKENS
                 ? Config.tokensPaid(stake)
                 : Config.creditsPaid(stake);
 
         float wobble = 1f + (random.nextFloat() * 2f - 1f) * Config.AMOUNT_VARIANCE;
-        return Math.max(1, Math.round(base * wobble));
+        return Math.max(0, Math.round(base * wobble));
+    }
+
+    private static boolean allowed(Prize prize, int stake) {
+        if(prize == Prize.CREDITS && Config.creditsPaid(stake)<=0) return false;
+        if(prize == Prize.STORY_POINT) return stake == 3;
+        return !prize.isFighterCrate() || !FighterPool.isEmpty();
     }
 }

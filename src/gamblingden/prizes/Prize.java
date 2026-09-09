@@ -15,6 +15,15 @@ public enum Prize {
             new Color(255, 200, 110), 0),
     CREDITS("credits", "Credits", "graphics/icons/cargo/credit_chips.png",
             new Color(140, 220, 140), 0),
+    STORY_POINT("story_point", "Story point", "graphics/icons/skills/command_experience.png",
+            new Color(255, 215, 115), 0),
+
+    FIGHTERS_SMALL("fighters_small", "Fighter crate - small", "graphics/icons/cargo/fighter_lpc.png",
+            new Color(135, 220, 225), 1),
+    FIGHTERS_MEDIUM("fighters_medium", "Fighter crate - medium", "graphics/icons/cargo/fighter_lpc.png",
+            new Color(100, 195, 235), 2),
+    FIGHTERS_LARGE("fighters_large", "Fighter crate - large", "graphics/icons/cargo/fighter_lpc.png",
+            new Color(155, 165, 255), 4),
 
     WEAPONS_SMALL("weapons_small", "Weapon crate - small", "graphics/icons/cargo/handweapons.png",
             new Color(215, 170, 120), 2),
@@ -56,9 +65,13 @@ public enum Prize {
         return this == WEAPONS_SMALL || this == WEAPONS_MEDIUM || this == WEAPONS_LARGE;
     }
 
-    /** Crates and boxes hold a countable number of things; cash and tokens do not. */
+    /** Item bundles use the crate-size slider; currency and story points do not. */
     public boolean isCrate() {
-        return isBox() || isWeaponCrate();
+        return isBox() || isWeaponCrate() || isFighterCrate();
+    }
+
+    public boolean isFighterCrate() {
+        return this == FIGHTERS_SMALL || this == FIGHTERS_MEDIUM || this == FIGHTERS_LARGE;
     }
 
     public boolean pays() {
@@ -67,9 +80,9 @@ public enum Prize {
 
     /** How many pips the drawn fallback symbol carries, so sizes read apart at a glance. */
     public int size() {
-        if (this == WEAPONS_SMALL || this == BOX_SMALL) return 1;
-        if (this == WEAPONS_MEDIUM || this == BOX_MEDIUM) return 2;
-        if (this == WEAPONS_LARGE || this == BOX_LARGE) return 3;
+        if (this == WEAPONS_SMALL || this == BOX_SMALL || this == FIGHTERS_SMALL) return 1;
+        if (this == WEAPONS_MEDIUM || this == BOX_MEDIUM || this == FIGHTERS_MEDIUM) return 2;
+        if (this == WEAPONS_LARGE || this == BOX_LARGE || this == FIGHTERS_LARGE) return 3;
         return 0;
     }
 }

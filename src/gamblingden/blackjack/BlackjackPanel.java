@@ -46,7 +46,7 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
         boolean contains(float x, float y) { return x>=this.x && x<=this.x+w && y>=this.y && y<=this.y+h; }
     }
     private static final class Face {
-        LabelAPI rank;
+        String rankText = "";
         Card card;
         boolean visible, hidden;
         float x, y, w, h;
@@ -59,7 +59,7 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
         label("BLACKJACK PAYS 3:2   |   DEALER STANDS ON SOFT 17",DIM,0,75,PANEL_W,18,Fonts.DEFAULT_SMALL);
         dealerLabel=label("",DIM,50,101,900,20,Fonts.DEFAULT_SMALL);
         for(int group=0;group<3;group++) for(int i=0;i<22;i++) {
-            Face face=new Face(); face.rank=label("",INK,0,0,26,18,Fonts.DEFAULT_SMALL); faces[group][i]=face;
+            faces[group][i]=new Face();
         }
         for(int i=0;i<2;i++) handLabels[i]=label("",GOLD,0,318,900,20,Fonts.DEFAULT_SMALL);
         result=label("",GOLD,28,516,944,20,Fonts.DEFAULT_SMALL);
@@ -128,7 +128,7 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
         }
     }
     private void arrange(int group, List<Card> cards, float left, float top, float width, boolean hideHole) {
-        for(Face face:faces[group]) { face.visible=false; face.rank.setText(""); }
+        for(Face face:faces[group]) { face.visible=false; face.rankText=""; }
         int count=Math.max(1,cards.size()), columns=count>10?(count+1)/2:count;
         float w=count>10?58:86, h=count>10?66:116;
         for(int i=0;i<count;i++) {
@@ -137,9 +137,7 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
             Face face=faces[group][i]; face.visible=true; face.card=cards.isEmpty()?null:cards.get(i);
             face.hidden=hideHole && i==1; face.x=left+(width-w-step*(rowCount-1))/2+column*step;
             face.y=top+row*(h+6); face.w=w; face.h=h;
-            face.rank.getPosition().inTL(face.x+2,face.y+5).setSize(26,18);
-            face.rank.setText(face.hidden || face.card==null?"":face.card.symbol());
-            if(face.card!=null) face.rank.setColor(ink(face.card));
+            face.rankText=face.hidden || face.card==null?"":face.card.symbol();
         }
     }
     private void act(String action) {
@@ -230,8 +228,9 @@ public final class BlackjackPanel extends BaseCustomUIPanelPlugin {
                 diamond(xx,yy,2,GOLD,a*.6f);
             frame(f.x+7,f.y+7,f.w-14,f.h-14,GOLD,a*.65f);
         } else {
+            CardRanks.draw(f.rankText,x(f.x+8),y(f.y+8),f.h>80?22:17,ink(f.card),a);
             suit(f.card.suit(),f.x+f.w/2,f.y+f.h*.57f,Math.min(18,f.h*.2f),ink(f.card),a);
-            if(f.h>80) suit(f.card.suit(),f.x+15,f.y+33,5,ink(f.card),a);
+            if(f.h>80) suit(f.card.suit(),f.x+15,f.y+43,5,ink(f.card),a);
         }
     }
     private void triangle(float ax,float ay,float bx,float by,float cx,float cy,Color c,float a) {

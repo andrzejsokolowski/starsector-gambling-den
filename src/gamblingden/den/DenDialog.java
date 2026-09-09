@@ -96,6 +96,7 @@ public class DenDialog implements InteractionDialogPlugin {
 
         options.addOption("Play pachinko", OPTION_PACHINKO);
         options.addOption("Play blackjack", OPTION_BLACKJACK);
+        options.addOption("Play Relic Jackpot", "gd_jackpot");
 
         options.addOption("Sell a hull to the keeper", OPTION_SELL_SHIP);
         if (ShipTradeIn.getTradeableShips().isEmpty()) {
@@ -139,6 +140,14 @@ public class DenDialog implements InteractionDialogPlugin {
                     new BlackjackDialogDelegate(game, () -> {
                         String summary = game.getSessionSummary();
                         if (!summary.isEmpty()) text.addPara(summary);
+                        showMenu();
+                    }));
+
+        } else if ("gd_jackpot".equals(optionData)) {
+            final var game=new gamblingden.jackpot.JackpotPanel();
+            dialog.showCustomVisualDialog(game.PANEL_W,game.PANEL_H,
+                    new gamblingden.jackpot.JackpotDialogDelegate(game,()->{
+                        for(String line:game.getSessionLog()) text.addPara(line);
                         showMenu();
                     }));
 

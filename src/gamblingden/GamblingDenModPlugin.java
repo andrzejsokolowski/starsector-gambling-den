@@ -26,6 +26,8 @@ public class GamblingDenModPlugin extends BaseModPlugin {
         TokenBank.migrateOldKeys();
         LegacyBarCleanup.removeOldEvents();
         WeaponPool.clearCache();
+        gamblingden.prizes.FighterPool.clearCache();
+        gamblingden.jackpot.JackpotGame.clearCache();
     }
 
     /**

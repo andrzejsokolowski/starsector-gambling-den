@@ -77,7 +77,7 @@ public final class PachinkoPreview {
             g.drawString(c.text,c.x+(c.w-fm.stringWidth(c.text))/2,c.y+fm.getAscent());
         }
         g.dispose();
-        File output=new File("build/"+(panel instanceof PachinkoPanel?"pachinko-":"blackjack-")+name+".png"); output.getParentFile().mkdirs();
+        File output=new File("build/"+(panel instanceof PachinkoPanel?"pachinko-":panel instanceof gamblingden.jackpot.JackpotPanel?"jackpot-":"blackjack-")+name+".png"); output.getParentFile().mkdirs();
         ImageIO.write(image,"png",output);
         System.out.println(output.getAbsolutePath());
     }
@@ -97,6 +97,7 @@ public final class PachinkoPreview {
             return null;
         });
         if(args.length>0 && args[0].equals("blackjack")) { blackjack(ui); return; }
+        if(args.length>0 && args[0].equals("jackpot")) { jackpot(ui); return; }
         PachinkoPanel panel=new PachinkoPanel(); panel.init(ui,null);
         Caption bounds=new Caption(); bounds.w=1000; bounds.h=660; panel.positionChanged(position(bounds));
         Pbuffer buffer=new Pbuffer(1000,660,new PixelFormat(),null);
@@ -153,6 +154,83 @@ public final class PachinkoPreview {
             }
             Method refresh=panel.getClass().getDeclaredMethod("refresh"); refresh.setAccessible(true); refresh.invoke(panel);
             save(panel,"crowded");
+            // Large face ranks: every rank/suit, without a shadow or UI font substitute.
+            int rank=1;
+            for(var hand:game.hands()) {
+                var list=(List<gamblingden.blackjack.BlackjackGame.Card>)cards.get(hand);list.clear();
+                for(int i=0;i<7 && rank<=13;i++,rank++) list.add(new gamblingden.blackjack.BlackjackGame.Card(rank,
+                        gamblingden.blackjack.BlackjackGame.Suit.values()[rank%4]));
+            }
+            refresh.invoke(panel);save(panel,"ranks");
+        } finally { buffer.destroy(); }
+    }
+
+    private static com.fs.starfarer.api.graphics.SpriteAPI sprite(String path) {
+        String filename=path.substring(path.lastIndexOf('/')+1);
+        String actual=switch(filename) {
+            case "gamma_core.png" -> "ai_core_gamma.png";case "beta_core.png" -> "ai_core_beta.png";case "alpha_core.png" -> "ai_core_alpha.png";
+            case "corrupted_nanoforge.png" -> "nanoforge_corrupted.png";case "pristine_nanoforge.png" -> "nanoforge_pristine.png";
+            case "synchrotron.png" -> "synchrotron_core.png";case "orbital_fusion_lamp.png" -> "fusion_lamp.png";
+            case "coronal_portal.png" -> "hypershunt_tap.png";case "mantle_bore.png" -> "terraforming_bore.png";
+            case "drone_replicator.png" -> "combat_drone_replicator.png";case "dealmaker_holosuite.png" -> "holosuite.png";
+            default -> filename;
+        };
+        float[] size={66,66},alpha={1};int[] texture={0};
+        return proxy(new Class<?>[]{com.fs.starfarer.api.graphics.SpriteAPI.class},(p,m,a)->switch(m.getName()) {
+            case "getTextureId" -> 1;
+            case "setSize" -> { size[0]=(Float)a[0];size[1]=(Float)a[1];yield null; }
+            case "setAlphaMult" -> { alpha[0]=(Float)a[0];yield null; }
+            case "renderAtCenter" -> {
+                if(texture[0]==0) {
+                    BufferedImage art=ImageIO.read(new File("D:/Games/StarSector/starsector-core/graphics/icons/cargo/"+actual));
+                    ByteBuffer pixels=BufferUtils.createByteBuffer(art.getWidth()*art.getHeight()*4);
+                    for(int y=art.getHeight()-1;y>=0;y--) for(int x=0;x<art.getWidth();x++) {
+                        int rgba=art.getRGB(x,y);pixels.put((byte)(rgba>>16)).put((byte)(rgba>>8)).put((byte)rgba).put((byte)(rgba>>24));
+                    }
+                    pixels.flip();texture[0]=GL11.glGenTextures();GL11.glBindTexture(GL11.GL_TEXTURE_2D,texture[0]);
+                    GL11.glTexParameteri(GL11.GL_TEXTURE_2D,GL11.GL_TEXTURE_MIN_FILTER,GL11.GL_LINEAR);
+                    GL11.glTexParameteri(GL11.GL_TEXTURE_2D,GL11.GL_TEXTURE_MAG_FILTER,GL11.GL_LINEAR);
+                    GL11.glTexImage2D(GL11.GL_TEXTURE_2D,0,GL11.GL_RGBA,art.getWidth(),art.getHeight(),0,GL11.GL_RGBA,GL11.GL_UNSIGNED_BYTE,pixels);
+                }
+                float x=(Float)a[0],y=(Float)a[1],w=size[0]/2,h=size[1]/2;
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D,texture[0]);GL11.glColor4f(1,1,1,alpha[0]);
+                GL11.glBegin(GL11.GL_QUADS);
+                GL11.glTexCoord2f(0,0);GL11.glVertex2f(x-w,y-h);GL11.glTexCoord2f(1,0);GL11.glVertex2f(x+w,y-h);
+                GL11.glTexCoord2f(1,1);GL11.glVertex2f(x+w,y+h);GL11.glTexCoord2f(0,1);GL11.glVertex2f(x-w,y+h);GL11.glEnd();
+                yield null;
+            }
+            default -> null;
+        });
+    }
+    private static void jackpot(CustomPanelAPI ui) throws Exception {
+        Method defaults=RegressionChecks.class.getDeclaredMethod("jackpotDefaults");defaults.setAccessible(true);defaults.invoke(null);
+        SettingsAPI original=Global.getSettings();
+        var images=new java.util.HashMap<String,com.fs.starfarer.api.graphics.SpriteAPI>();
+        Global.setSettings(proxy(new Class<?>[]{SettingsAPI.class},(p,m,a)->{
+            if(m.getName().equals("getSprite")) return images.computeIfAbsent((String)a[0],PachinkoPreview::sprite);
+            return m.invoke(original,a);
+        }));
+        var panel=new gamblingden.jackpot.JackpotPanel();panel.init(ui,null);
+        Caption bounds=new Caption();bounds.w=1000;bounds.h=660;panel.positionChanged(position(bounds));
+        Method act=panel.getClass().getDeclaredMethod("act",String.class);act.setAccessible(true);
+        Field rng=panel.getClass().getDeclaredField("random");rng.setAccessible(true);
+        Pbuffer buffer=new Pbuffer(1000,660,new PixelFormat(),null);
+        try {
+            buffer.makeCurrent();GL11.glViewport(0,0,1000,660);
+            GL11.glMatrixMode(GL11.GL_PROJECTION);GL11.glLoadIdentity();GL11.glOrtho(0,1000,0,660,-1,1);
+            GL11.glMatrixMode(GL11.GL_MODELVIEW);GL11.glLoadIdentity();
+            // Mock names use actual vanilla art names where item IDs differ.
+            save(panel,"ready");
+            long win=0,lose=0;
+            for(int seed=0;seed<10000;seed++) {
+                TokenBank.addTokens(6);
+                var round=gamblingden.jackpot.JackpotGame.buy(2,new Random(seed));
+                if(round.winner()!=null) { win=seed;break; }
+                lose=seed;
+            }
+            ((Random)rng.get(panel)).setSeed(win);act.invoke(panel,"pull");panel.advance(.5f);save(panel,"spinning");
+            act.invoke(panel,"skip");save(panel,"win");
+            ((Random)rng.get(panel)).setSeed(lose);act.invoke(panel,"pull");act.invoke(panel,"skip");save(panel,"loss");
         } finally { buffer.destroy(); }
     }
 }

@@ -861,6 +861,12 @@ public class SlotMachinePanel extends BaseCustomUIPanelPlugin {
         sprite.setNormalBlend();
         sprite.setColor(highlight ? Color.WHITE : new Color(220, 222, 232));
         sprite.renderAtCenter(cx, cy);
+        if(symbol.isFighterCrate()) {
+            GL11.glDisable(GL11.GL_TEXTURE_2D);
+            for(int i=0;i<symbol.size();i++) GLDraw.circle(cx-(symbol.size()-1)*6+i*12,
+                    cy-size*.46f,3,symbol.color,alphaMult,12);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+        }
     }
 
     /** A crate with one pip per size, for when the art will not load. */

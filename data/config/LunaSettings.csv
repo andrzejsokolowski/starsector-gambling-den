@@ -6,11 +6,15 @@ gd_count_box_large,Hull mod box - large,Int,10,,How many hull mod blueprints a l
 gd_count_weapons_small,Weapon crate - small,Int,2,,How many weapons a small crate holds.,1,100,Payouts
 gd_count_weapons_medium,Weapon crate - medium,Int,5,,How many weapons a medium crate holds.,1,100,Payouts
 gd_count_weapons_large,Weapon crate - large,Int,12,,How many weapons a large crate holds.,1,100,Payouts
+gd_count_fighters_small,Fighter crate - small,Int,1,,Fighter LPCs in a small crate.,1,100,Payouts
+gd_count_fighters_medium,Fighter crate - medium,Int,2,,Fighter LPCs in a medium crate.,1,100,Payouts
+gd_count_fighters_large,Fighter crate - large,Int,4,,Fighter LPCs in a large crate.,1,100,Payouts
 gd_header_cash,Cash and tokens,Header,Cash and tokens,,,,,Payouts
-gd_credits_low,Credits at low stakes,Int,8000,,Credits the cash symbol pays at low stakes.,100,2000000,Payouts
-gd_credits_mid,Credits at mid stakes,Int,25000,,Credits the cash symbol pays at mid stakes.,100,2000000,Payouts
-gd_credits_high,Credits at high stakes,Int,60000,,Credits the cash symbol pays at high stakes.,100,2000000,Payouts
-gd_credits_max,Credits at max stakes,Int,120000,,Credits the cash symbol pays at max stakes.,100,2000000,Payouts
+gd_credit_percent,Credit payout percentage,Int,25,,Percent of the base credit values below. Also applies to cash for unavailable hullmods.,0,100,Payouts
+gd_credits_low,Base credits at low stakes,Int,8000,,Base amount before the credit payout percentage and random variance.,100,2000000,Payouts
+gd_credits_mid,Base credits at mid stakes,Int,25000,,Base amount before the credit payout percentage and random variance.,100,2000000,Payouts
+gd_credits_high,Base credits at high stakes,Int,60000,,Base amount before the credit payout percentage and random variance.,100,2000000,Payouts
+gd_credits_max,Base credits at max stakes,Int,120000,,Base amount before the credit payout percentage and random variance.,100,2000000,Payouts
 gd_tokens_low,Tokens at low stakes,Int,8,,Tokens the token symbol pays at low stakes.,1,1000,Payouts
 gd_tokens_mid,Tokens at mid stakes,Int,20,,Tokens the token symbol pays at mid stakes.,1,1000,Payouts
 gd_tokens_high,Tokens at high stakes,Int,45,,Tokens the token symbol pays at high stakes.,1,1000,Payouts
