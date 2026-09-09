@@ -81,6 +81,12 @@ If `fr.jar` is installed in `starsector-core`, the checks also send 600 panel fr
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
 
+## Release 1.0.0
+
+The first stable release, confirmed working through the user's in-game playtest. Gameplay,
+settings and rewards are unchanged from 0.5.0. This is the tested baseline for adding more
+games to the den; Slots remains its first game.
+
 ## Changes in 0.5.0
 
 Slots has four stake levels at 1, 2, 4 and 8 tokens per reel. The buttons show those costs.

@@ -3,7 +3,7 @@
   "name": "Gambling Den",
   "author": "Oddisz",
   "utility": "false",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "logo": "gambling-den-icon.png",
   "description": "A back-room gambling den at every port of size 6 or more. Sell surplus hulls for tokens. Slots is the first game, with more games planned: choose one to five reels and stake 1, 2, 4 or 8 tokens per reel. Most reels bust; wins pay credits, tokens, weapon crates and hull mod boxes. A large hull mod box holds ten blueprints by default and skips hull mods you already know. Crate sizes and odds have LunaLib sliders.",
   "gameVersion": "0.98a-RC8",
