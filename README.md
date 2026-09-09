@@ -9,8 +9,10 @@ recovered frigates you are never going to fly.
 
 ## How it works
 
-**Find it.** A bar event at independent ports. A machine behind a curtain that used to be a
-thermal blanket, and a keeper who owns exactly one thing.
+**Find it.** In the bar at any independent port, every time — it is a place, not a rumour, so it
+is not part of the random bar-event rota and cannot crowd anybody else's events out. A machine
+behind a curtain that used to be a thermal blanket, and a keeper who owns exactly one thing.
+Set `factions` in the config to open it at other ports, or to `["*"]` for every port with a bar.
 
 **Pay in hulls, not credits.** The keeper buys ships off you for tokens, priced on how much ship
 it is rather than what it is worth on paper, so a pile of frigates is worth having. Every d-mod

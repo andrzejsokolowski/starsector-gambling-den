@@ -3,7 +3,7 @@
   "name": "Gambling Den",
   "author": "Oddisz",
   "utility": "false",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A back-room gambling den in the bar of any independent port. Sell surplus hulls for tokens, then feed them to the machine. Prizes are credits, cargo, weapon crates and hull mod boxes - a large box is ten hull mod blueprints at once, and the machine never hands you one you already know. Set the machine up how you like it: one reel or five, low stakes or high.",
   "gameVersion": "0.98a-RC8",
   "jars": ["jars/GamblingDen.jar"],

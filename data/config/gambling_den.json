@@ -1,4 +1,11 @@
 {
+	# ------------------------------------------------------------------- where
+	# Faction ids whose ports the den is open at. It appears in the bar at every
+	# matching market, every time - it is a place, not a rumour, so it does not
+	# compete with the random bar events and cannot crowd them out.
+	# Put a single "*" in this list to open it at every port that has a bar.
+	"factions": ["independent"],
+
 	# ------------------------------------------------------------------ tokens
 	# Tokens are the only currency in the den, and hulls are the only way to buy them.
 	# A hull is priced on how much ship it is (fleet points), not what it would fetch

@@ -3,6 +3,7 @@ package gamblingden;
 import com.fs.starfarer.api.BaseModPlugin;
 import com.fs.starfarer.api.Global;
 
+import gamblingden.bar.DenInstaller;
 import gamblingden.economy.TokenBank;
 import gamblingden.prizes.Prize;
 
@@ -22,6 +23,9 @@ public class GamblingDenModPlugin extends BaseModPlugin {
     public void onGameLoad(boolean newGame) {
         Config.load();
         TokenBank.migrateOldKeys();
+        // Puts the den in the bar and keeps it there. Runs as a transient script so it happens
+        // once the sector is fully up, and leaves nothing of its own in the save.
+        Global.getSector().addTransientScript(new DenInstaller());
     }
 
     /**

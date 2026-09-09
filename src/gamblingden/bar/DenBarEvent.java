@@ -9,10 +9,10 @@ import com.fs.starfarer.api.campaign.InteractionDialogAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.campaign.rules.MemoryAPI;
 import com.fs.starfarer.api.fleet.FleetMemberAPI;
-import com.fs.starfarer.api.impl.campaign.ids.Factions;
 import com.fs.starfarer.api.impl.campaign.intel.bar.events.BaseBarEvent;
 import com.fs.starfarer.api.util.Misc;
 
+import gamblingden.Config;
 import gamblingden.economy.ShipTradeIn;
 import gamblingden.economy.TokenBank;
 import gamblingden.slots.SlotMachine;
@@ -32,11 +32,17 @@ public class DenBarEvent extends BaseBarEvent {
     private static final String OPTION_SELL_CHIPS = "gd_sell_chips";
     private static final String OPTION_LEAVE = "gd_leave";
 
+    /**
+     * Which ports the den is open at.
+     *
+     * Deliberately does not call super. The base version pins an event to the first market it
+     * was shown at, which is right for one person with one proposition and wrong for a place -
+     * the den is the same den wherever you find it, and it should be there every time.
+     */
     @Override
     public boolean shouldShowAtMarket(MarketAPI market) {
-        if (!super.shouldShowAtMarket(market)) return false;
         if (market == null) return false;
-        return Factions.INDEPENDENT.equals(market.getFactionId());
+        return Config.showsAtFaction(market.getFactionId());
     }
 
     @Override
