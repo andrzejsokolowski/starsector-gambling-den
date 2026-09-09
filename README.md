@@ -13,13 +13,13 @@ and token balance, with their own rules. Poker is planned for a later update.
 
 **Find it.** *Visit the gambling den* is its own option when you dock at any port of size 6 or
 more — not a bar event, so it is always there rather than turning up at random. Cabinets behind
-a curtain that used to be a thermal blanket, watched by a keeper. The size
+a curtain that used to be a thermal blanket, watched by a croupier. The size
 requirement is the `$marketSize >= 6` line in `data/campaign/rules.csv` if you want it elsewhere.
 
-**Pay in hulls, not credits.** The keeper buys ships off you for tokens, priced on how much ship
+**Sell a ship for tokens.** The croupier buys ships for tokens, priced on how much ship
 it is rather than what it is worth on paper, so a pile of frigates is worth having. Every d-mod
-knocks a slice off. Your flagship is not for sale. Blueprint chips you have already read are
-worth tokens too.
+knocks a slice off. Your flagship is not for sale. Ships are the only way to buy tokens;
+the duplicate-blueprint exchange is removed. You can also win tokens by playing.
 
 Selected ships get a named, itemised quote and a confirmation before sale. Removable weapons
 and fighter wings, including those on ship modules, return to your cargo.
@@ -35,7 +35,7 @@ the way a slot machine is supposed to; the ones that do not are worth having. Ma
 across two or more reels and the whole payout doubles, unless it contains story points.
 
 Prizes include credits, tokens, weapon crates, fighter crates, and hullmod boxes.
-A large hullmod box holds ten blueprints by default. Fighter crates hold 1, 2, or 4 fighter LPCs,
+Hullmod boxes hold 1, 3, or 5 blueprints by default. Fighter crates hold 1, 2, or 4 fighter LPCs,
 items that equip a carrier with fighter wings. Each LPC gets its own weighted random draw.
 Fighter rewards avoid repeats until every eligible wing appears. Built-in, restricted, mission,
 no-drop, and no-sell wings are excluded.
@@ -58,15 +58,30 @@ Every action has a button. Space pulls and Escape leaves, but neither is the onl
 
 ## Pachinko
 
-Choose **Hullmods**, **Weapons**, or **Tokens**, then drop **1, 10 or 50 balls**. Keep buying
+Choose **Hullmods**, **Weapons**, **Tokens**, or **Credits**, then drop **1, 10 or 50 balls**. Keep buying
 balls while earlier ones are falling. Each button shows the full cost of its batch; purchases
 are all-or-nothing. Default prices per ball are 4 tokens for hullmods, 2 for weapons, and 1
-for tokens. Balls feed rapidly from the centre, bouncing off ten rows of pegs and each other.
+for tokens; credit balls cost 2 tokens. Balls feed rapidly from the centre, bouncing off ten rows of pegs and each other.
 The board allows up to 100 falling or queued balls at once. Landed balls free room for more.
 
-Weapon and token pocket amounts, from left to right, are:
+Weapon pocket amounts, from left to right, are:
 
 `16 | 8 | 4 | 2 | 1 | 0 | 1 | 2 | 4 | 8 | 16`
+
+Token pocket amounts are:
+
+`12 | 3 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 3 | 12`
+
+Credit pocket amounts are:
+
+`200k | 50k | 10k | 2.5k | 500 | 0 | 500 | 2.5k | 10k | 50k | 200k`
+
+Credit pockets pay those exact amounts; the Slots credit percentage does not apply.
+Credits enter your balance on landing and are not paid again on exit.
+The token layout has its own sliders, so previously saved weapon payouts do not override it.
+In 30,000-ball samples per play mode, it returned about 0.78–0.96 tokens per one-token ball,
+including 0.9592 during continuous play with up to 100 balls.
+These are simulation results, not a guarantee for an individual run.
 
 Hullmod pocket amounts are:
 
@@ -76,7 +91,7 @@ Each outer pocket pays one random blueprint; the middle five pay nothing.
 These are direct quantities, not boxes or a second roll for a prize.
 Each landing adds item rewards to the pending winnings total.
 The game generates and transfers items when you leave the Pachinko screen.
-Pending items remain across batches and category changes. Token wins and refunds pay on landing,
+Pending items remain across batches and category changes. Credits, token wins, and refunds pay on landing,
 so you can immediately use them to buy more balls.
 
 Each weapon gets a separate random draw. Within one ball's reward, a weapon cannot repeat
@@ -173,11 +188,17 @@ Fighter crate sizes have their own sliders, from 1 to 100 LPCs.
 **LunaLib settings page**, adjustable with sliders while the game is running: how many blueprints
 are in each size of hull mod box, how many weapons in each size of crate (1 to 100 either way),
 what the cash and token symbols pay at each stake, the chance a reel pays anything at all, and
-what the keeper gives per fleet point of hull.
+what the croupier gives per fleet point of a ship.
 
-The **Pachinko** tab has separate ball-price sliders for each category, six weapon/token pocket
-sliders, and six separate hullmod pocket sliders (0–100). Each amount applies symmetrically
-at the same distance from the centre. Saved weapon/token pocket settings do not change hullmod pockets.
+Hullmod box payout percentage defaults to 50%. It applies to the base box counts, including
+previously saved values, and rounds down with at least one blueprint. Base counts of 3/6/10
+therefore pay 1/3/5. Set it to 100% to use the base counts unchanged.
+Weapons, fighter crates, win chances, and already-won boxes are unaffected.
+
+The **Pachinko** tab has separate ball-price sliders and six pocket sliders for each category.
+Weapon, hullmod, and token pockets range from 0–100; credit pockets range from 0–2,000,000.
+Each amount applies symmetrically at the same distance from the centre.
+Changing one category's pocket settings does not affect another.
 They do not use the Slots crate-size sliders. A purchased ball keeps its quoted price and
 pocket amounts if settings change during its fall.
 
@@ -208,6 +229,28 @@ with both icon sizes into `GamblingDen.zip`.
 If `fr.jar` is installed in `starsector-core`, the checks also send 2,400 panel frames through
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
+
+## Changes in 1.5.0
+
+Fixes Anime mode: the game's sprite renderer disabled blending, so the board's shade covered
+the image instead of darkening it. The background now preserves the drawing state.
+The graphics test reproduces the fault with the 1.4.0 renderer and passes with the fix.
+
+Adds a Credits board with 0/500/2.5k/10k/50k/200k pockets from centre to edge,
+mirrored on both sides. Credit balls cost 2 tokens by default and pay credits on landing.
+All four reward categories have separate pocket controls.
+
+Token pockets now use 0/1/1/1/3/12 from centre to edge. The proposed 0/1/1/2/7/21 layout
+still paid more than the ball cost in the same simulation, so the defaults use the lower strip.
+Tests cover 150,000 balls across single-ball, batch, and continuous play.
+
+Slots hullmod boxes default to half their old contents, rounded down: 1/3/5.
+The new percentage slider also applies to saved settings. Win chances are unchanged.
+The menu now says Sell a ship for tokens, and the croupier accepts ships rather than credits.
+The duplicate-blueprint exchange and its payment code are removed.
+
+Automated checks cover immediate credit payments, safe exits, saved box settings, mouse-only
+selection, the background, and Fast Rendering. Offscreen previews were inspected; a live-game test is still needed.
 
 ## Changes in 1.4.0
 

@@ -29,7 +29,6 @@ public class Config {
 
     public static float SHIP_TOKENS_PER_FP = 1.5f;
     public static float SHIP_TOKEN_PENALTY_PER_DMOD = 0.1f;
-    public static float TOKENS_PER_CREDIT_OF_DUPLICATE = 0.0015f;
 
     public static int REELS_DEFAULT = 3;
     public static int REELS_MAX = 5;
@@ -90,7 +89,13 @@ public class Config {
     /** How many things this crate holds right now, slider included. */
     public static int countOf(Prize prize) {
         Integer set = luna(countKey(prize));
-        return Math.min(100, Math.max(1, set != null ? set : prize.count));
+        int count=Math.min(100, Math.max(1, set != null ? set : prize.count));
+        if(prize.isBox()) {
+            Integer percent=luna("gd_hullmod_box_percent");
+            int scale=percent==null?50:Math.max(1,Math.min(100,percent));
+            count=Math.max(1,count*scale/100);
+        }
+        return count;
     }
 
     public static int creditsPaid(int stake) {
@@ -145,9 +150,6 @@ public class Config {
             SHIP_TOKENS_PER_FP = (float) json.optDouble("shipTokensPerFleetPoint", SHIP_TOKENS_PER_FP);
             SHIP_TOKEN_PENALTY_PER_DMOD =
                     (float) json.optDouble("shipTokenPenaltyPerDMod", SHIP_TOKEN_PENALTY_PER_DMOD);
-            TOKENS_PER_CREDIT_OF_DUPLICATE =
-                    (float) json.optDouble("tokensPerCreditOfDuplicate", TOKENS_PER_CREDIT_OF_DUPLICATE);
-
             REELS_MAX = Math.min(5, Math.max(1, json.optInt("reelsMax", REELS_MAX)));
             REELS_DEFAULT = Math.min(REELS_MAX, Math.max(1, json.optInt("reelsDefault", REELS_DEFAULT)));
 

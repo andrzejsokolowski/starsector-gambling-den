@@ -23,9 +23,13 @@ public final class PachinkoBackdrop {
     public boolean active() { return sprite!=null; }
     public void draw(float x,float y,float w,float h,float alpha) {
         if(sprite==null) return;
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        sprite.setSize(w,h);sprite.setColor(Color.WHITE);sprite.setAlphaMult(alpha);
-        sprite.setAngle(0);sprite.setNormalBlend();sprite.renderAtCenter(x+w/2,y+h/2);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
+        // Starsector's Sprite.render() disables blending on return. Preserve it so the
+        // board's translucent shade does not become an opaque rectangle over the art.
+        GL11.glPushAttrib(GL11.GL_ENABLE_BIT|GL11.GL_COLOR_BUFFER_BIT|GL11.GL_CURRENT_BIT|GL11.GL_TEXTURE_BIT);
+        try {
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            sprite.setSize(w,h);sprite.setColor(Color.WHITE);sprite.setAlphaMult(alpha);
+            sprite.setAngle(0);sprite.setNormalBlend();sprite.renderAtCenter(x+w/2,y+h/2);
+        } finally { GL11.glPopAttrib(); }
     }
 }

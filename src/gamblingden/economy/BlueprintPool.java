@@ -87,22 +87,4 @@ public class BlueprintPool {
                 .addSpecial(new SpecialItemData(Ids.MODSPEC, spec.getId()), 1f);
     }
 
-    /** Every blueprint chip in the hold whose hull mod the player already knows. */
-    public static List<CargoStackAPI> getDuplicateChips() {
-        List<CargoStackAPI> out = new ArrayList<CargoStackAPI>();
-        if (Global.getSector().getPlayerFleet() == null) return out;
-        CargoAPI cargo = Global.getSector().getPlayerFleet().getCargo();
-        if (cargo == null) return out;
-
-        for (CargoStackAPI stack : cargo.getStacksCopy()) {
-            SpecialItemData special = stack.getSpecialDataIfSpecial();
-            if (special == null) continue;
-            if (!Ids.MODSPEC.equals(special.getId())) continue;
-            String modId = special.getData();
-            if (modId == null) continue;
-            if (!Global.getSector().getPlayerFaction().knowsHullMod(modId)) continue;
-            out.add(stack);
-        }
-        return out;
-    }
 }

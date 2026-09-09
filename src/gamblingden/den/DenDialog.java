@@ -40,7 +40,6 @@ public class DenDialog implements InteractionDialogPlugin {
     private static final String OPTION_PACHINKO = "gd_pachinko";
     private static final String OPTION_BLACKJACK = "gd_blackjack";
     private static final String OPTION_SELL_SHIP = "gd_sell_ship";
-    private static final String OPTION_SELL_CHIPS = "gd_sell_chips";
     private static final String OPTION_LEAVE = "gd_leave";
     private static final String OPTION_CONFIRM_SALE = "gd_confirm_sale";
     private static final String OPTION_CANCEL_SALE = "gd_cancel_sale";
@@ -73,8 +72,8 @@ public class DenDialog implements InteractionDialogPlugin {
                 + "behind cracked glass; next to them, steel balls rattle through a forest of pegs. "
                 + "A hand-lettered card reads: NO CREDIT. NO REFUNDS. NO EXCEPTIONS.");
 
-        text.addPara("\"It eats hulls,\" the keeper says, before you can ask. \"Not credits. "
-                + "Credits it has seen.\"");
+        text.addPara("\"Ships, not credits,\" the croupier says. \"Sell a ship for tokens, "
+                + "then take your pick of the games.\"");
 
         showMenu();
     }
@@ -98,20 +97,11 @@ public class DenDialog implements InteractionDialogPlugin {
         options.addOption("Play blackjack", OPTION_BLACKJACK);
         options.addOption("Play Relic Jackpot", "gd_jackpot");
 
-        options.addOption("Sell a hull to the keeper", OPTION_SELL_SHIP);
+        options.addOption("Sell a ship for tokens", OPTION_SELL_SHIP);
         if (ShipTradeIn.getTradeableShips().isEmpty()) {
             options.setEnabled(OPTION_SELL_SHIP, false);
             options.setTooltip(OPTION_SELL_SHIP, "You have nothing to sell but your flagship, "
-                    + "and the keeper is not interested in that.");
-        }
-
-        int duplicates = ShipTradeIn.countDuplicates();
-        if (duplicates > 0) {
-            int worth = ShipTradeIn.previewDuplicateValue();
-            options.addOption("Hand over " + duplicates
-                    + (duplicates == 1 ? " blueprint chip" : " blueprint chips")
-                    + " you have already read  (" + worth
-                    + (worth == 1 ? " token" : " tokens") + ")", OPTION_SELL_CHIPS);
+                    + "and the croupier is not interested in that.");
         }
 
         options.addOption("Leave the den", OPTION_LEAVE);
@@ -161,15 +151,8 @@ public class DenDialog implements InteractionDialogPlugin {
             quotedShips.clear();
             showMenu();
 
-        } else if (OPTION_SELL_CHIPS.equals(optionData)) {
-            int paid = ShipTradeIn.tradeInAllDuplicates();
-            text.addPara("The keeper feeds the chips into a reader one by one, grunts, and "
-                    + "counts out %s.", Misc.getHighlightColor(),
-                    paid + (paid == 1 ? " token" : " tokens"));
-            showMenu();
-
         } else if (OPTION_LEAVE.equals(optionData)) {
-            text.addPara("\"It will be here,\" the keeper says. \"It is always here.\"");
+            text.addPara("The croupier nods as you leave.");
             backToPort();
         }
     }
@@ -215,7 +198,7 @@ public class DenDialog implements InteractionDialogPlugin {
         }
 
         dialog.showFleetMemberPickerDialog(
-                "Select hulls for a quote", "Get quote", "Cancel",
+                "Select ships for a quote", "Get quote", "Cancel",
                 4, 7, 88f, true, true, pool,
                 new FleetMemberPickerListener() {
                     @Override
@@ -256,13 +239,13 @@ public class DenDialog implements InteractionDialogPlugin {
         }
         text.addPara("Removable weapons and fighter wings return to your cargo.");
         options.clearOptions();
-        options.addOption("Sell " + quotedShips.size() + (quotedShips.size() == 1 ? " hull" : " hulls")
+        options.addOption("Sell " + quotedShips.size() + (quotedShips.size() == 1 ? " ship" : " ships")
                 + " for " + total + " tokens", OPTION_CONFIRM_SALE);
         if (total > Integer.MAX_VALUE - TokenBank.getTokens()) {
             options.setEnabled(OPTION_CONFIRM_SALE, false);
             options.setTooltip(OPTION_CONFIRM_SALE, "This sale would exceed the token balance limit.");
         }
-        options.addOption("Choose different hulls", OPTION_SELL_SHIP);
+        options.addOption("Choose different ships", OPTION_SELL_SHIP);
         options.addOption("Cancel", OPTION_CANCEL_SALE);
     }
 
@@ -270,7 +253,7 @@ public class DenDialog implements InteractionDialogPlugin {
         long total = 0;
         for (Map.Entry<FleetMemberAPI, Integer> quote : quotedShips.entrySet()) {
             if (!ShipTradeIn.isTradeable(quote.getKey())) {
-                text.addPara("The fleet has changed. Select your hulls again.");
+                text.addPara("The fleet has changed. Select your ships again.");
                 quotedShips.clear();
                 showMenu();
                 return;
@@ -287,7 +270,7 @@ public class DenDialog implements InteractionDialogPlugin {
             paid += ShipTradeIn.tradeIn(quote.getKey(), quote.getValue());
         }
         quotedShips.clear();
-        text.addPara("The keeper counts out %s.", Misc.getHighlightColor(), paid + " tokens");
+        text.addPara("The croupier counts out %s.", Misc.getHighlightColor(), paid + " tokens");
         Global.getSoundPlayer().playUISound("ui_chip_pickup", 1f, 1f);
         showMenu();
     }

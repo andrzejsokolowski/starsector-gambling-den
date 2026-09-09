@@ -239,14 +239,14 @@ public class RegressionChecks {
         hullmods.add(hullmod("known",1)); known.add("known");
         hullmods.add(hullmod("held",1)); chips.add("held");
         Payout box=new Payout(); box.add(Prize.BOX_LARGE,1);
-        check(box.describe().contains("2 hull mod blueprints") && box.describe().contains("40,000 credits"),"Partial exhaustion preview");
+        check(box.describe().contains("2 hull mod blueprints") && box.describe().contains("15,000 credits"),"Partial exhaustion preview");
         var receipt=box.grant(new Random(1));
-        check(receipt.getBlueprints()==2 && receipt.getCredits()==40000,"Partial exhaustion receipt");
-        check(credits==40000 && chips.size()==3,"Actual cargo differs from receipt");
-        box.grant(new Random(1)); check(credits==40000,"Prize paid twice");
+        check(receipt.getBlueprints()==2 && receipt.getCredits()==15000,"Partial exhaustion receipt");
+        check(credits==15000 && chips.size()==3,"Actual cargo differs from receipt");
+        box.grant(new Random(1)); check(credits==15000,"Prize paid twice");
         check(BlueprintPool.isExhausted(),"Zero rarity/no-drop/known/held exclusion");
         Payout emptyBox=new Payout(); emptyBox.add(Prize.BOX_SMALL,1);
-        check(emptyBox.describe().contains("15,000 credits"),"Exhausted box preview");
+        check(emptyBox.describe().contains("5,000 credits"),"Exhausted box preview");
         check(emptyBox.grant(new Random(1)).getBlueprints()==0,"Exhausted box awarded a blueprint");
 
         weapons.add(weapon("normal",1,false)); weapons.add(weapon("fighter",1,true));
@@ -314,6 +314,14 @@ public class RegressionChecks {
             default -> null;
         });
         DenDialog.open(dialog,new HashMap<>());
+        check(options.get("gd_sell_ship").equals("Sell a ship for tokens"),"Requested ship-sale label missing");
+        check(text.stream().anyMatch(s->s.contains("croupier") && s.contains("Ships, not credits")),"Croupier entry currency unclear");
+        check(text.stream().noneMatch(s->s.contains("eats hulls")),"Old hull-eating text remains");
+        known.add("duplicate");chips.add("duplicate");hullmods.add(hullmod("duplicate",1));
+        invoke(currentDialog,"showMenu",new Class<?>[0],new Object[0]);
+        check(!options.containsKey("gd_sell_chips"),"Blueprint exchange still offered");
+        currentDialog.optionSelected("Old blueprint exchange","gd_sell_chips");
+        check(TokenBank.getTokens()==0 && chips.contains("duplicate"),"Removed blueprint option still pays");
         invoke(currentDialog,"quoteShips",List.class,List.of(alpha,beta));
         check(fleet.size()==3 && TokenBank.getTokens()==0,"Quote sold ships");
         check(text.stream().anyMatch(s->s.contains("Alpha") && s.contains("15 tokens")),"Alpha quote missing");
@@ -542,8 +550,12 @@ public class RegressionChecks {
                     for (int i = 0; i < 40; i++) hullmods.add(hullmod("pachinko_" + i, 1));
                     weapons.add(weapon("test_gun", 1, false));
                     var offer = gamblingden.pachinko.PachinkoRound.offer(category);
-                    int[] expected = category.name().equals("HULLMODS")
-                            ? new int[]{1,1,1,0,0,0,0,0,1,1,1} : new int[]{16,8,4,2,1,0,1,2,4,8,16};
+                    int[] expected = switch(category) {
+                        case HULLMODS -> new int[]{1,1,1,0,0,0,0,0,1,1,1};
+                        case WEAPONS -> new int[]{16,8,4,2,1,0,1,2,4,8,16};
+                        case TOKENS -> new int[]{12,3,1,1,1,0,1,1,1,3,12};
+                        case CREDITS -> new int[]{200000,50000,10000,2500,500,0,500,2500,10000,50000,200000};
+                    };
                     for (int i=0;i<11;i++) check(offer.amount(i)==expected[i], "Wrong pachinko pocket layout");
                     var round = gamblingden.pachinko.PachinkoRound.buy(offer, new Random(seed * 7919L));
                     check(round != null && TokenBank.getTokens()==1000-offer.cost, "Ball not charged exactly once");
@@ -557,7 +569,8 @@ public class RegressionChecks {
                     check(chips.size() == (category.name().equals("HULLMODS") ? amount : 0), "Pachinko hullmod mismatch/crate multiplication");
                     check(guns.getOrDefault("test_gun",0) == (category.name().equals("WEAPONS") ? amount : 0), "Pachinko weapon mismatch/crate multiplication");
                     check(TokenBank.getTokens()==1000-offer.cost+(category.name().equals("TOKENS")?amount:0), "Pachinko token mismatch");
-                    check(credits==0, "Targeted prize unexpectedly converted to credits");
+                    check(credits==(category.name().equals("CREDITS")?amount:0), "Credit payout wrong or paid twice");
+                    check(receipt.getCredits()==(category.name().equals("CREDITS")?amount:0),"Credit receipt mismatch");
                     check(amount==0 ? round.getResult().equals("Nothing.") : round.getResult().startsWith("Won "+amount+" "), "Result disagrees with pocket");
                 }
                 for(boolean pocket:seen) check(pocket,"Payout category never reached a pocket");
@@ -655,6 +668,8 @@ public class RegressionChecks {
             check(!gamblingden.pachinko.PachinkoSettings.animeMode(),"Anime mode should default off");
             reset(); TokenBank.addTokens(2000); weapons.add(weapon("custom_gun",1,false));
             for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,100);
+            check(Arrays.equals(gamblingden.pachinko.PachinkoSettings.amounts(gamblingden.pachinko.PachinkoSettings.Category.TOKENS),
+                    new int[]{12,3,1,1,1,0,1,1,1,3,12}),"Old shared settings defeated token nerf");
             check(Arrays.equals(gamblingden.pachinko.PachinkoSettings.amounts(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS),
                     new int[]{1,1,1,0,0,0,0,0,1,1,1}),"Shared pocket sliders changed hullmod payouts");
             settings.put("gd_pachinko_cost_weapons",7);
@@ -734,12 +749,31 @@ public class RegressionChecks {
             loader.setHasLoaded(true);
             lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
             Global.setSettings(proxy(SettingsAPI.class,(m,a)->{
+                if(m.getName().equals("getSprite") && a[0].equals(gamblingden.pachinko.PachinkoBackdrop.IMAGE)) {
+                    SpriteAPI recorded=sprite((String)a[0]);
+                    float[] dimensions={80,80},opacity={1};
+                    return proxy(SpriteAPI.class,(sm,sa)->{
+                        if(sm.getName().equals("setSize")) { dimensions[0]=(Float)sa[0];dimensions[1]=(Float)sa[1]; }
+                        if(sm.getName().equals("setAlphaMult")) opacity[0]=(Float)sa[0];
+                        if(sm.getName().equals("renderAtCenter")) {
+                            GL11.glEnable(GL11.GL_BLEND);GL11.glBlendFunc(GL11.GL_SRC_ALPHA,GL11.GL_ONE_MINUS_SRC_ALPHA);
+                            GL11.glDisable(GL11.GL_TEXTURE_2D);
+                            gamblingden.ui.GLDraw.quad((Float)sa[0]-dimensions[0]/2,(Float)sa[1]-dimensions[1]/2,
+                                    dimensions[0],dimensions[1],java.awt.Color.RED,opacity[0]);
+                            GL11.glDisable(GL11.GL_BLEND); // Actual Starsector Sprite.render() side effect.
+                        }
+                        return sm.invoke(recorded,sa);
+                    });
+                }
                 if(m.getName().equals("loadTexture") && a[0].equals(gamblingden.pachinko.PachinkoBackdrop.IMAGE)) {
                     check(!rendering[0],"Background loaded on the rendering path");loads[0]++;
                 }
                 return m.invoke(original,a);
             }));
             buffer.makeCurrent();
+            GL11.glViewport(0,0,1200,800);
+            GL11.glMatrixMode(GL11.GL_PROJECTION);GL11.glLoadIdentity();GL11.glOrtho(0,1200,0,800,-1,1);
+            GL11.glMatrixMode(GL11.GL_MODELVIEW);GL11.glLoadIdentity();
             String baseline=null;
             for(boolean enabled:new boolean[]{false,true}) {
                 reset();recordIcons=true;TokenBank.addTokens(100);
@@ -759,6 +793,11 @@ public class RegressionChecks {
                 else check(outcome.equals(baseline),"Anime mode changed ball results or accounting");
                 long draws=drawnIcons.stream().filter(i->i.path().equals(gamblingden.pachinko.PachinkoBackdrop.IMAGE)).count();
                 check(draws==(enabled?200:0) && loads[0]==(enabled?1:0),"Background redrawn/loaded incorrectly");
+                if(enabled) {
+                    java.nio.ByteBuffer pixel=BufferUtils.createByteBuffer(4);
+                    GL11.glReadPixels(170,450,1,1,GL11.GL_RGBA,GL11.GL_UNSIGNED_BYTE,pixel);
+                    check((pixel.get(0)&255)>100,"Opaque board shade covered the background after Sprite disabled blending");
+                }
                 panel.finishOnDismissal();
             }
             Global.setSettings(proxy(SettingsAPI.class,(m,a)->{
@@ -774,6 +813,91 @@ public class RegressionChecks {
             rendering[0]=false;recordIcons=false;buffer.destroy();Global.setSettings(original);
             lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous);loader.setHasLoaded(loaded);
         }
+    }
+
+    private static void pachinkoCredits() throws Exception {
+        var loader=lunalib.backend.ui.settings.LunaSettingsLoader.INSTANCE;
+        boolean loaded=loader.getHasLoaded();var previous=lunalib.backend.ui.settings.LunaSettingsLoader.getSettings();
+        var settings=new org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject("unused-test-settings");
+        for(String line:java.nio.file.Files.readAllLines(java.nio.file.Path.of("data/config/LunaSettings.csv"))) {
+            String[] c=line.split(",",-1);
+            if(!line.startsWith("gd_pachinko_")) continue;
+            if(c[2].equals("Int")) settings.put(c[0],Integer.parseInt(c[3]));
+            if(c[2].equals("Boolean")) settings.put(c[0],Boolean.parseBoolean(c[3]));
+        }
+        try {
+            loader.setHasLoaded(true);
+            lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
+            for(String close:List.of("leave","escape","external")) {
+                reset();TokenBank.addTokens(10000);
+                var panel=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+                // Fourth category must have a real mouse hitbox and require no weapon stock.
+                invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{700f,85f,true});
+                check(get(panel,"category")==gamblingden.pachinko.PachinkoSettings.Category.CREDITS,"Credits category click failed");
+                var offer=(gamblingden.pachinko.PachinkoRound.Offer)get(panel,"offer");
+                check(offer.cost==2 && offer.maximum()==200000,"Default credit-board quote incorrect");
+                var labels=(List<?>)get(panel,"pocketLabels");
+                String[] expected={"200k","50k","10k","2.5k","500","0","500","2.5k","10k","50k","200k"};
+                for(int i=0;i<11;i++) check(((LabelAPI)labels.get(i)).getText().equals(expected[i]),"Credit pocket label wrong");
+                invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{500f,625f,false});
+                invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{500f,625f,true});
+                check(TokenBank.getTokens()==9900,"Credits batch price wrong");
+                long awarded;
+                try {
+                    forbidRewards=true;
+                    invoke(panel,"act",String.class,"skip");
+                    var held=(gamblingden.pachinko.PachinkoWinnings)get(panel,"winnings");
+                    awarded=held.credits();
+                    check(awarded>0 && credits==awarded && held.blueprints()==0 && held.weapons()==0 && held.tokens()==0,
+                            "Credits were delayed or paid in another reward type");
+                    check(((LabelAPI)get(panel,"result")).getText().startsWith("Won "+awarded+" credits"),"Credit result text mismatch");
+                    check(held.describe().isEmpty(),"Already paid credits still shown as pending");
+                } finally { forbidRewards=false; }
+                if(close.equals("leave")) invoke(panel,"act",String.class,"leave");
+                else if(close.equals("escape")) panel.processInput(List.of(key(Keyboard.KEY_ESCAPE)));
+                else new gamblingden.pachinko.PachinkoDialogDelegate(panel,()->{}).reportDismissed(0);
+                panel.finishOnDismissal();
+                check(credits==awarded && TokenBank.getTokens()==9900,"Exit repeated credit payment or refunded a valid wager");
+                check(panel.getSessionLog().equals(List.of(awarded+" credits paid during play")),"Credit receipt missing/wrong");
+            }
+            reset();TokenBank.addTokens(10000);
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_credit_pocket_"+i,2000000);
+            var panel=(gamblingden.pachinko.PachinkoPanel)machine(gamblingden.pachinko.PachinkoPanel.class);
+            invoke(panel,"act",String.class,"category:CREDITS");
+            for(int batch=0;batch<12;batch++) {
+                invoke(panel,"act",String.class,"drop50");invoke(panel,"act",String.class,"drop50");
+                invoke(panel,"act",String.class,"skip");
+            }
+            var held=(gamblingden.pachinko.PachinkoWinnings)get(panel,"winnings");
+            check(held.credits()==2400000000L && credits==2400000000d && TokenBank.getTokens()==7600,"Large credit total overflow or token contamination");
+            panel.finishOnDismissal();panel.finishOnDismissal();
+            check(held.collect(new Random()).getCredits()==2400000000L && credits==2400000000d,"Large credit receipt overflow");
+            System.out.println("PASS: credit Pachinko, mouse selection, immediate payment, every exit, and large totals.");
+        } finally { forbidRewards=false;lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous);loader.setHasLoaded(loaded); }
+    }
+
+    private static void boxDefaults() throws Exception {
+        check(Config.countOf(Prize.BOX_SMALL)==1 && Config.countOf(Prize.BOX_MEDIUM)==3 && Config.countOf(Prize.BOX_LARGE)==5,"Wrong default half-size boxes");
+        var loader=lunalib.backend.ui.settings.LunaSettingsLoader.INSTANCE;
+        boolean loaded=loader.getHasLoaded();var previous=lunalib.backend.ui.settings.LunaSettingsLoader.getSettings();
+        var settings=new org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject("unused-test-settings");
+        try {
+            loader.setHasLoaded(true);
+            lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
+            settings.put("gd_hullmod_box_percent",50);
+            settings.put("gd_count_box_small",3);settings.put("gd_count_box_medium",6);settings.put("gd_count_box_large",10);
+            settings.put("gd_credit_percent",25);
+            check(Config.countOf(Prize.BOX_SMALL)==1 && Config.countOf(Prize.BOX_MEDIUM)==3 && Config.countOf(Prize.BOX_LARGE)==5,"Saved old sizes defeated the nerf");
+            reset();for(int i=0;i<100;i++) hullmods.add(hullmod("box_"+i,1));
+            Payout held=new Payout();held.add(Prize.BOX_LARGE,1);
+            settings.put("gd_hullmod_box_percent",100);
+            check(Config.countOf(Prize.BOX_LARGE)==10,"Percentage control ignored");
+            check(held.grant(new Random(1)).getBlueprints()==5,"Setting change altered an already-won box");
+            settings.put("gd_count_box_large",100);settings.put("gd_hullmod_box_percent",50);
+            check(Config.countOf(Prize.BOX_LARGE)==50,"Custom box count not scaled");
+            settings.put("gd_count_weapons_large",12);settings.put("gd_count_fighters_large",4);
+            check(Config.countOf(Prize.WEAPONS_LARGE)==12 && Config.countOf(Prize.FIGHTERS_LARGE)==4,"Box nerf affected weapons/fighters");
+        } finally { lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous);loader.setHasLoaded(loaded); }
     }
 
     private static void pachinkoDeferred(org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject settings) throws Exception {
@@ -809,6 +933,10 @@ public class RegressionChecks {
                 invoke(panel,"act",String.class,"skip");
             }
             check(held.weapons()==20000 && held.blueprints()==3,"New runs/categories lost or capped pooled winnings");
+            invoke(panel,"act",String.class,"category:TOKENS");
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_token_pocket_"+i,100);
+            // Refresh the displayed quote before the new run.
+            invoke(panel,"act",String.class,"category:WEAPONS");
             invoke(panel,"act",String.class,"category:TOKENS");
             invoke(panel,"act",String.class,"drop50"); invoke(panel,"act",String.class,"skip");
             check(held.tokens()==5000 && TokenBank.getTokens()==103492,"Token winnings delayed until exit");
@@ -1036,7 +1164,7 @@ public class RegressionChecks {
                 game.finishOnDismissal();
                 check(TokenBank.getTokens()==5000-50*balls.get(0).offer.cost+refunds+(category.name().equals("TOKENS")?units:0),"Shared-category accounting mismatch");
                 check(chips.size()==(category.name().equals("HULLMODS")?units:0) && guns.getOrDefault("batch_gun",0)==(category.name().equals("WEAPONS")?units:0)
-                        && credits==0,"Wrong cargo from shared board");
+                        && credits==(category.name().equals("CREDITS")?units:0),"Wrong cargo from shared board");
                 String state=balls.stream().map(b->b.board.getPocket()+":"+b.getResult()).toList().toString()+new java.util.TreeSet<>(chips)+TokenBank.getTokens();
                 if(baseline==null) baseline=state;
                 else check(state.equals(baseline),"FPS/skip changed scarce stock settlement order");
@@ -1169,6 +1297,7 @@ public class RegressionChecks {
             loader.setHasLoaded(true);
             lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
             settings.put("gd_credits_max",120000);
+            settings.put("gd_hullmod_box_percent",50);
             check(Config.creditsPaid(3)==30000,"Saved old Luna value defeated credit reduction");
             settings.put("gd_credit_percent",50);check(Config.creditsPaid(3)==60000,"Credit slider ignored");
             settings.put("gd_hit_max",Math.round(Config.HIT_CHANCE[3]*100));
@@ -1313,12 +1442,13 @@ public class RegressionChecks {
     }
 
     public static void main(String[] args) throws Exception {
+        if(args.length>0 && args[0].equals("background")) { setup();pachinkoBackground();return; }
         if(args.length>0 && args[0].equals("fast-renderer")) {
             setup(); FastRendererChecks.run(RegressionChecks::machine); return;
         }
         setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
         PachinkoPhysicsChecks.run(); PachinkoPhysicsChecks.multiBall(); pachinko(); pachinkoSettings(); pachinkoBatches();
-        pachinkoBackground(); BlackjackChecks.run(); blackjackUI(); blackjackCardArt(); expandedRewards(); jackpot();
+        pachinkoBackground(); pachinkoCredits(); boxDefaults(); PachinkoBalanceChecks.run(); BlackjackChecks.run(); blackjackUI(); blackjackCardArt(); expandedRewards(); jackpot();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }

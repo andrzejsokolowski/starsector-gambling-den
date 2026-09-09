@@ -1,8 +1,9 @@
 fieldID,fieldName,fieldType,defaultValue,secondaryValue,fieldDescription,minValue,maxValue,tab
 gd_header_crates,Crate contents,Header,Crate contents,,,,,Payouts
-gd_count_box_small,Hull mod box - small,Int,3,,How many hull mod blueprints a small box holds.,1,100,Payouts
-gd_count_box_medium,Hull mod box - medium,Int,6,,How many hull mod blueprints a medium box holds.,1,100,Payouts
-gd_count_box_large,Hull mod box - large,Int,10,,How many hull mod blueprints a large box holds.,1,100,Payouts
+gd_hullmod_box_percent,Hullmod box payout percentage,Int,50,,Percent of the base box counts below. Rounds down with at least one blueprint. Applies to previously saved box counts.,1,100,Payouts
+gd_count_box_small,Base blueprints - small box,Int,3,,Base count before the hullmod box payout percentage.,1,100,Payouts
+gd_count_box_medium,Base blueprints - medium box,Int,6,,Base count before the hullmod box payout percentage.,1,100,Payouts
+gd_count_box_large,Base blueprints - large box,Int,10,,Base count before the hullmod box payout percentage.,1,100,Payouts
 gd_count_weapons_small,Weapon crate - small,Int,2,,How many weapons a small crate holds.,1,100,Payouts
 gd_count_weapons_medium,Weapon crate - medium,Int,5,,How many weapons a medium crate holds.,1,100,Payouts
 gd_count_weapons_large,Weapon crate - large,Int,12,,How many weapons a large crate holds.,1,100,Payouts
@@ -25,19 +26,34 @@ gd_hit_mid,Chance a reel pays - mid stakes,Int,20,,Percent chance that one reel 
 gd_hit_high,Chance a reel pays - high stakes,Int,26,,Percent chance that one reel lands on something rather than busting.,1,100,Odds
 gd_hit_max,Chance a reel pays - max stakes,Int,32,,Percent chance that one reel lands on something rather than busting.,1,100,Odds
 gd_header_tokens,Buying tokens,Header,Buying tokens,,,,,Odds
-gd_ship_tokens_per_fp,Tokens per fleet point,Double,1.5,,"What the keeper pays for a hull, per fleet point. At 1.5 a Kite is about 5 tokens, a Hammerhead 15 and an Onslaught 45. Each d-mod knocks 10 percent off.",0.1,20,Odds
+gd_ship_tokens_per_fp,Tokens per fleet point,Double,1.5,,"What the croupier pays for a ship, per fleet point. At 1.5 a Kite is about 5 tokens, a Hammerhead 15 and an Onslaught 45. Each d-mod knocks 10 percent off.",0.1,20,Odds
 gd_pachinko_header_cost,Ball prices,Header,Ball prices,,,,,Pachinko
 gd_pachinko_cost_hullmods,Hullmod ball price,Int,4,,Tokens paid for one ball on the hullmod board.,1,1000,Pachinko
 gd_pachinko_cost_weapons,Weapon ball price,Int,2,,Tokens paid for one ball on the weapon board.,1,1000,Pachinko
 gd_pachinko_token_price,Token ball price,Int,1,,Tokens paid for one ball on the token board.,1,1000,Pachinko
 gd_pachinko_anime_mode,Anime mode,Boolean,false,,Show an anime background. Reopen Pachinko to apply.,,,Pachinko
-gd_pachinko_header_pockets,Weapon and token pockets,Header,Weapon and token pockets,,,,,Pachinko
-gd_pachinko_pocket_0,Centre pocket,Int,0,,Items or tokens paid by the centre pocket. These are direct quantities rather than crate counts.,0,100,Pachinko
-gd_pachinko_pocket_1,One pocket from centre,Int,1,,Items or tokens paid on either side of the centre.,0,100,Pachinko
-gd_pachinko_pocket_2,Two pockets from centre,Int,2,,Items or tokens paid two pockets from the centre.,0,100,Pachinko
-gd_pachinko_pocket_3,Three pockets from centre,Int,4,,Items or tokens paid three pockets from the centre.,0,100,Pachinko
-gd_pachinko_pocket_4,Four pockets from centre,Int,8,,Items or tokens paid four pockets from the centre.,0,100,Pachinko
-gd_pachinko_pocket_5,Outer pockets,Int,16,,Items or tokens paid at either edge of the board.,0,100,Pachinko
+gd_pachinko_cost_credits,Credit ball price,Int,2,,Tokens paid for one ball on the credit board.,1,1000,Pachinko
+gd_pachinko_header_tokens,Token pockets,Header,Token pockets,,,,,Pachinko
+gd_pachinko_token_pocket_0,Tokens - centre pocket,Int,0,,Tokens paid by the centre pocket.,0,100,Pachinko
+gd_pachinko_token_pocket_1,Tokens - one from centre,Int,1,,Tokens paid one pocket from the centre.,0,100,Pachinko
+gd_pachinko_token_pocket_2,Tokens - two from centre,Int,1,,Tokens paid two pockets from the centre.,0,100,Pachinko
+gd_pachinko_token_pocket_3,Tokens - three from centre,Int,1,,Tokens paid three pockets from the centre.,0,100,Pachinko
+gd_pachinko_token_pocket_4,Tokens - four from centre,Int,3,,Tokens paid four pockets from the centre.,0,100,Pachinko
+gd_pachinko_token_pocket_5,Tokens - outer pockets,Int,12,,Tokens paid at either edge.,0,100,Pachinko
+gd_pachinko_header_credits,Credit pockets,Header,Credit pockets,,,,,Pachinko
+gd_pachinko_credit_pocket_0,Credits - centre pocket,Int,0,,Credits paid by the centre pocket.,0,2000000,Pachinko
+gd_pachinko_credit_pocket_1,Credits - one from centre,Int,500,,Credits paid one pocket from the centre.,0,2000000,Pachinko
+gd_pachinko_credit_pocket_2,Credits - two from centre,Int,2500,,Credits paid two pockets from the centre.,0,2000000,Pachinko
+gd_pachinko_credit_pocket_3,Credits - three from centre,Int,10000,,Credits paid three pockets from the centre.,0,2000000,Pachinko
+gd_pachinko_credit_pocket_4,Credits - four from centre,Int,50000,,Credits paid four pockets from the centre.,0,2000000,Pachinko
+gd_pachinko_credit_pocket_5,Credits - outer pockets,Int,200000,,Credits paid at either edge.,0,2000000,Pachinko
+gd_pachinko_header_pockets,Weapon pockets,Header,Weapon pockets,,,,,Pachinko
+gd_pachinko_pocket_0,Weapons - centre pocket,Int,0,,Weapons paid by the centre pocket.,0,100,Pachinko
+gd_pachinko_pocket_1,Weapons - one from centre,Int,1,,Weapons paid one pocket from the centre.,0,100,Pachinko
+gd_pachinko_pocket_2,Weapons - two from centre,Int,2,,Weapons paid two pockets from the centre.,0,100,Pachinko
+gd_pachinko_pocket_3,Weapons - three from centre,Int,4,,Weapons paid three pockets from the centre.,0,100,Pachinko
+gd_pachinko_pocket_4,Weapons - four from centre,Int,8,,Weapons paid four pockets from the centre.,0,100,Pachinko
+gd_pachinko_pocket_5,Weapons - outer pockets,Int,16,,Weapons paid at either edge.,0,100,Pachinko
 gd_pachinko_header_hullmods,Hullmod pockets,Header,Hullmod pockets,,,,,Pachinko
 gd_pachinko_hullmod_pocket_0,Hullmods - centre pocket,Int,0,,Blueprints paid by the centre pocket.,0,100,Pachinko
 gd_pachinko_hullmod_pocket_1,Hullmods - one from centre,Int,0,,Blueprints paid one pocket from the centre.,0,100,Pachinko

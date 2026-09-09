@@ -15,11 +15,11 @@ import gamblingden.economy.TokenBank;
 import gamblingden.pachinko.PachinkoSettings.Category;
 import gamblingden.prizes.WeaponPool;
 
-/** Visit-wide winnings. Landings only reserve counts; item rolls and cargo writes happen on exit. */
+/** Visit-wide winnings. Item rolls wait for exit; currency is paid on landing. */
 public final class PachinkoWinnings {
     private int hullmodsLeft = BlueprintPool.getEligible().size();
     private final boolean weaponsAvailable = !WeaponPool.isEmpty();
-    private long blueprints, weapons, tokens, refunds, weaponBetCosts;
+    private long blueprints, weapons, tokens, credits, refunds, weaponBetCosts;
     private final List<HullLot> hullLots = new ArrayList<HullLot>();
     private final Map<Integer, Long> weaponLots = new LinkedHashMap<Integer, Long>();
     private Receipt collected;
@@ -34,10 +34,11 @@ public final class PachinkoWinnings {
     public long blueprints() { return blueprints; }
     public long weapons() { return weapons; }
     public long tokens() { return tokens; }
+    public long credits() { return credits; }
     public long refunds() { return refunds; }
     public boolean isCollected() { return collected != null; }
     public boolean stockAvailable(Category category) {
-        return collected == null && (category == Category.TOKENS
+        return collected == null && (category == Category.TOKENS || category == Category.CREDITS
                 || (category == Category.HULLMODS ? hullmodsLeft > 0 : weaponsAvailable));
     }
     /** Item wins only reserve counts. Tokens are a cheap balance update, available immediately. */
@@ -50,6 +51,9 @@ public final class PachinkoWinnings {
         } else if (category == Category.WEAPONS) {
             weapons += amount; weaponBetCosts += cost;
             weaponLots.put(amount, weaponLots.getOrDefault(amount, 0L) + 1);
+        } else if(category==Category.CREDITS) {
+            Global.getSector().getPlayerFleet().getCargo().getCredits().add(amount);
+            credits += amount;
         } else {
             if (tokenRoom() < amount) return false;
             tokens += TokenBank.addTokens(amount);
@@ -126,6 +130,8 @@ public final class PachinkoWinnings {
             }
         }
         collected.tokens = tokens + refunds;
+        collected.credits = credits;
+        if(credits>0) collected.lines.add(credits+" credits paid during play");
         collected.refunds = refunds;
         if (tokens + refunds > 0) collected.lines.add((tokens + refunds) + " tokens paid during play"
                 + (refunds > 0 ? " (includes " + refunds + " refunded)" : ""));
@@ -138,11 +144,12 @@ public final class PachinkoWinnings {
     }
 
     public static final class Receipt {
-        private long blueprints, weapons, tokens, refunds;
+        private long blueprints, weapons, tokens, credits, refunds;
         private final List<String> lines = new ArrayList<String>();
         public long getBlueprints() { return blueprints; }
         public long getWeapons() { return weapons; }
         public long getTokens() { return tokens; }
+        public long getCredits() { return credits; }
         public long getRefunds() { return refunds; }
         public List<String> getLines() { return new ArrayList<String>(lines); }
     }

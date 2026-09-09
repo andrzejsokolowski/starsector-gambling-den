@@ -96,7 +96,7 @@ public final class PachinkoRound {
 
     public boolean isSettled() { return settled; }
     public String getResult() { return result; }
-    /** Item quantities are reserved for exit; token quantities are already paid. */
+    /** Item quantities are reserved for exit; currency quantities are already paid. */
     public int getAwarded() { return awarded; }
     public int getRefunded() { return refunded; }
     public PachinkoWinnings getWinnings() { return winnings; }
@@ -115,8 +115,7 @@ public final class PachinkoRound {
             refund("Reward unavailable"); return;
         }
         awarded = amount;
-        result = "Won " + amount + (offer.category == Category.HULLMODS ? " hullmod blueprints."
-                : offer.category == Category.WEAPONS ? " weapons." : " tokens.");
+        result = "Won " + amount + " " + PachinkoSettings.units(offer.category) + ".";
     }
 
     private void refund(String reason) {

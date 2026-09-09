@@ -11,16 +11,13 @@ import java.util.Set;
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.CampaignFleetAPI;
 import com.fs.starfarer.api.campaign.CargoAPI;
-import com.fs.starfarer.api.campaign.CargoStackAPI;
-import com.fs.starfarer.api.campaign.SpecialItemData;
 import com.fs.starfarer.api.fleet.FleetMemberAPI;
 import com.fs.starfarer.api.combat.ShipVariantAPI;
 import com.fs.starfarer.api.impl.campaign.DModManager;
-import com.fs.starfarer.api.loading.HullModSpecAPI;
 
 import gamblingden.Config;
 
-/** Turns surplus hulls, and blueprint chips you no longer need, into dispenser tokens. */
+/** Exchanges surplus ships for tokens. */
 public class ShipTradeIn {
 
     /** Ships the machine's owner will take off your hands. Never your flagship. */
@@ -103,60 +100,5 @@ public class ShipTradeIn {
         ancestors.remove(variant);
     }
 
-    /** What one already-known blueprint chip is worth in tokens. */
-    public static int valueOfDuplicate(String hullModId) {
-        HullModSpecAPI spec = Global.getSettings().getHullModSpec(hullModId);
-        if (spec == null) return 1;
-        int tokens = Math.round(spec.getBaseValue() * Config.TOKENS_PER_CREDIT_OF_DUPLICATE);
-        return Math.max(1, tokens);
-    }
-
-    /**
-     * Feeds every blueprint chip the player already knows into the machine.
-     * Returns the tokens paid out.
-     */
-    public static int tradeInAllDuplicates() {
-        long total = 0;
-        for (CargoStackAPI stack : BlueprintPool.getDuplicateChips()) {
-            SpecialItemData special = stack.getSpecialDataIfSpecial();
-            if (special == null || special.getData() == null) continue;
-
-            int count = (int) stack.getSize();
-            if (count <= 0) continue;
-
-            int value = valueOfDuplicate(special.getData());
-            count = (int) Math.min(count, (Integer.MAX_VALUE - TokenBank.getTokens() - total) / value);
-            if (count <= 0) continue;
-            total += (long) value * count;
-            Global.getSector().getPlayerFleet().getCargo().removeItems(
-                    CargoAPI.CargoItemType.SPECIAL, special, count);
-        }
-        if (total > 0) TokenBank.addTokens((int) total);
-        return (int) total;
-    }
-
-    /** Total tokens the player's duplicate chips are worth, without spending them. */
-    public static int previewDuplicateValue() {
-        long total = 0;
-        for (CargoStackAPI stack : BlueprintPool.getDuplicateChips()) {
-            SpecialItemData special = stack.getSpecialDataIfSpecial();
-            if (special == null || special.getData() == null) continue;
-            int count = (int) stack.getSize();
-            if (count <= 0) continue;
-            int value = valueOfDuplicate(special.getData());
-            count = (int) Math.min(count, (Integer.MAX_VALUE - TokenBank.getTokens() - total) / value);
-            total += (long) value * count;
-        }
-        return (int) total;
-    }
-
-    /** How many blueprint chips the player is carrying that they already know. */
-    public static int countDuplicates() {
-        int count = 0;
-        for (CargoStackAPI stack : BlueprintPool.getDuplicateChips()) {
-            count += (int) stack.getSize();
-        }
-        return count;
-    }
 
 }

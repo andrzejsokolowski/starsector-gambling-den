@@ -9,7 +9,8 @@ public final class PachinkoSettings {
     public enum Category {
         HULLMODS("Hullmods", "hullmods", 4, new Color(135, 200, 245)),
         WEAPONS("Weapons", "weapons", 2, new Color(220, 150, 100)),
-        TOKENS("Tokens", "tokens", 1, new Color(135, 220, 165));
+        TOKENS("Tokens", "tokens", 1, new Color(135, 220, 165)),
+        CREDITS("Credits", "credits", 2, new Color(245, 205, 110));
 
         public final String label, id;
         public final int defaultCost;
@@ -21,6 +22,8 @@ public final class PachinkoSettings {
 
     private static final int[] DEFAULT_AMOUNTS = {0, 1, 2, 4, 8, 16};
     private static final int[] HULLMOD_AMOUNTS = {0, 0, 0, 1, 1, 1};
+    private static final int[] TOKEN_AMOUNTS = {0, 1, 1, 1, 3, 12};
+    private static final int[] CREDIT_AMOUNTS = {0, 500, 2500, 10000, 50000, 200000};
     private PachinkoSettings() { }
 
     private static int setting(String key, int fallback, int min, int max) {
@@ -43,13 +46,31 @@ public final class PachinkoSettings {
 
     public static int[] amounts(Category category) {
         int[] byDistance = new int[6];
+        String prefix=switch(category) {
+            case HULLMODS -> "gd_pachinko_hullmod_pocket_";
+            case TOKENS -> "gd_pachinko_token_pocket_";
+            case CREDITS -> "gd_pachinko_credit_pocket_";
+            case WEAPONS -> "gd_pachinko_pocket_";
+        };
+        int[] defaults=switch(category) {
+            case HULLMODS -> HULLMOD_AMOUNTS;case TOKENS -> TOKEN_AMOUNTS;
+            case CREDITS -> CREDIT_AMOUNTS;case WEAPONS -> DEFAULT_AMOUNTS;
+        };
         for (int distance = 0; distance <= 5; distance++) {
-            boolean hullmods=category==Category.HULLMODS;
-            byDistance[distance] = setting((hullmods?"gd_pachinko_hullmod_pocket_":"gd_pachinko_pocket_") + distance,
-                    hullmods?HULLMOD_AMOUNTS[distance]:DEFAULT_AMOUNTS[distance], 0, 100);
+            byDistance[distance] = setting(prefix+distance, defaults[distance], 0, category==Category.CREDITS?2000000:100);
         }
         int[] pockets = new int[PachinkoBoard.POCKETS];
         for (int i = 0; i < pockets.length; i++) pockets[i] = byDistance[Math.abs(i - 5)];
         return pockets;
+    }
+
+    public static String units(Category category) {
+        return switch(category) { case HULLMODS -> "blueprints"; case WEAPONS -> "weapons";
+            case TOKENS -> "tokens"; case CREDITS -> "credits"; };
+    }
+    public static String pocketLabel(Category category,int amount) {
+        if(category!=Category.CREDITS || amount<1000) return Integer.toString(amount);
+        return (amount%1000==0?Integer.toString(amount/1000):
+                java.math.BigDecimal.valueOf(amount,3).stripTrailingZeros().toPlainString())+"k";
     }
 }

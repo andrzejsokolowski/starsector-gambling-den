@@ -70,7 +70,8 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
         tokens = label("", Color.WHITE, 0, 48, PANEL_W, 18, Fonts.DEFAULT_SMALL);
         int i = 0;
         for (Category choice : Category.values()) {
-            button("category:" + choice.name(), choice.label, 300 + i++ * 136, 74, 128, 28);
+            float start=(PANEL_W-(Category.values().length*136-8))/2;
+            button("category:" + choice.name(), choice.label, start + i++ * 136, 74, 128, 28);
         }
         for (i = 0; i < PachinkoBoard.POCKETS; i++) {
             pocketLabels.add(label("", Color.WHITE, BOARD_X + i * PachinkoBoard.POCKET_WIDTH,
@@ -114,11 +115,11 @@ public final class PachinkoPanel extends BaseCustomUIPanelPlugin {
                 : category == Category.HULLMODS && stockAvailable
                 ? (offer.notice.isEmpty() ? "Shared hullmod stock; unavailable ball rewards are refunded."
                 : offer.notice + " Unavailable ball rewards are refunded.") : offer.notice);
-        if (purchased > 1) result.setText("Won " + awarded + (category == Category.HULLMODS ? " blueprints" : category == Category.WEAPONS
-                ? " weapons" : " tokens") + "  |  " + completed + "/" + purchased + " balls landed"
+        if (purchased > 1) result.setText("Won " + awarded + " " + PachinkoSettings.units(category)
+                + "  |  " + completed + "/" + purchased + " balls landed"
                 + (refunded > 0 ? "  |  " + refunded + " tokens refunded" : ""));
         for (int i = 0; i < pocketLabels.size(); i++) {
-            pocketLabels.get(i).setText(Integer.toString(offer.amount(i)));
+            pocketLabels.get(i).setText(PachinkoSettings.pocketLabel(category,offer.amount(i)));
             pocketLabels.get(i).setColor(offer.amount(i) == 0 ? DIM : Color.WHITE);
         }
         for (Btn button : buttons) {

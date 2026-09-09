@@ -10,8 +10,6 @@
 	"shipTokensPerFleetPoint": 1.5,
 	# Each d-mod knocks this fraction off the price. Never drops below 20% of full.
 	"shipTokenPenaltyPerDMod": 0.1,
-	# Blueprint chips you have already read are worth this many tokens per credit of value.
-	"tokensPerCreditOfDuplicate": 0.0015,
 
 	# ------------------------------------------------------------------ machine
 	"reelsDefault": 3,
@@ -52,7 +50,8 @@
 	},
 
 	# ------------------------------------------------------------------ prizes
-	# Fallbacks for the sliders, used if LunaLib is not answering.
+	# Base counts before the hullmod box percentage (50% by default).
+	# Weapon and fighter crates are not scaled by that percentage.
 	"crateContents": {
 		"box_small": 3, "box_medium": 6, "box_large": 10,
 		"weapons_small": 2, "weapons_medium": 5, "weapons_large": 12,

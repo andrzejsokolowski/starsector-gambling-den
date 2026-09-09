@@ -141,6 +141,10 @@ public final class PachinkoPreview {
             for(int frame=0;frame<80;frame++) panel.advance(1f/60);
             save(panel,"multiball");
             act.invoke(panel,"skip"); save(panel,"batch-paid");
+            act.invoke(panel,"category:CREDITS");save(panel,"credits-ready");
+            TokenBank.addTokens(1000);act.invoke(panel,"drop50");
+            for(int frame=0;frame<80;frame++) panel.advance(1f/60);
+            save(panel,"credits-falling");act.invoke(panel,"skip");save(panel,"credits-paid");
         } finally { buffer.destroy(); }
     }
 
@@ -228,6 +232,7 @@ public final class PachinkoPreview {
                 GL11.glBegin(GL11.GL_QUADS);
                 GL11.glTexCoord2f(0,0);GL11.glVertex2f(x-w,y-h);GL11.glTexCoord2f(1,0);GL11.glVertex2f(x+w,y-h);
                 GL11.glTexCoord2f(1,1);GL11.glVertex2f(x+w,y+h);GL11.glTexCoord2f(0,1);GL11.glVertex2f(x-w,y+h);GL11.glEnd();
+                GL11.glDisable(GL11.GL_BLEND); // Match Starsector's real Sprite renderer.
                 yield null;
             }
             default -> null;
