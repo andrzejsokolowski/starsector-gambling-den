@@ -1,4 +1,4 @@
-package hullmoddispenser.economy;
+package gamblingden.economy;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -14,28 +14,18 @@ import com.fs.starfarer.api.impl.campaign.ids.Tags;
 import com.fs.starfarer.api.loading.HullModSpecAPI;
 import com.fs.starfarer.api.util.WeightedRandomPicker;
 
-import hullmoddispenser.Ids;
+import gamblingden.Ids;
 
 /**
- * Decides which hull mod blueprints the machine is allowed to dispense, and hands them over.
+ * Decides which hull mod blueprints a box is allowed to contain, and hands them over.
  *
  * The filter matches the one the base game uses for blueprint drops out in space, so modded
- * hull mods are covered automatically and anything an author marked as undroppable stays that
- * way. On top of that we skip chips the player is already carrying, so the machine can never
- * dispense the same blueprint twice.
+ * hull mods are covered for free and anything an author marked as undroppable stays that way.
+ * On top of that we skip chips the player is already carrying, so a box can never contain a
+ * blueprint you already have - not even twice within the same box, because each one lands in
+ * the hold before the next is drawn.
  */
 public class BlueprintPool {
-
-    /** The highest quality band the machine deals in. */
-    public static final int TOP_TIER = 3;
-
-    /** Squashes an author's tier number into the 0..3 band the machine understands. */
-    public static int bandOf(HullModSpecAPI spec) {
-        int tier = spec.getTier();
-        if (tier < 0) return 0;
-        if (tier > TOP_TIER) return TOP_TIER;
-        return tier;
-    }
 
     /** Blueprint ids the player already has a chip for, anywhere in the fleet's holds. */
     private static Set<String> chipsInCargo() {
@@ -43,6 +33,7 @@ public class BlueprintPool {
         if (Global.getSector().getPlayerFleet() == null) return held;
         CargoAPI cargo = Global.getSector().getPlayerFleet().getCargo();
         if (cargo == null) return held;
+
         for (CargoStackAPI stack : cargo.getStacksCopy()) {
             SpecialItemData special = stack.getSpecialDataIfSpecial();
             if (special == null) continue;
@@ -52,12 +43,8 @@ public class BlueprintPool {
         return held;
     }
 
-    /**
-     * Every blueprint the machine could legitimately hand out right now.
-     *
-     * @param band 0..3 to restrict to one quality band, or -1 for all of them.
-     */
-    public static List<HullModSpecAPI> getEligible(int band) {
+    /** Every blueprint the machine could legitimately hand out right now. */
+    public static List<HullModSpecAPI> getEligible() {
         Set<String> held = chipsInCargo();
         List<HullModSpecAPI> out = new ArrayList<HullModSpecAPI>();
 
@@ -67,32 +54,19 @@ public class BlueprintPool {
             if (spec.isHidden() || spec.isHiddenEverywhere()) continue;
             if (spec.hasTag(Tags.HULLMOD_NO_DROP)) continue;
             if (held.contains(spec.getId())) continue;
-            if (band >= 0 && bandOf(spec) != band) continue;
             out.add(spec);
         }
         return out;
     }
 
     /**
-     * Picks one blueprint from a quality band, weighted the way the base game weights drops.
-     * Falls back to a neighbouring band if the requested one is empty, and returns null only
-     * when the player has learned or is carrying everything the machine could offer.
+     * Draws one blueprint, weighted the way the base game weights drops. Returns null only
+     * when the player already knows or is carrying everything the machine could offer.
      */
-    public static HullModSpecAPI pick(int band, Random random) {
-        for (int attempt = 0; attempt <= TOP_TIER; attempt++) {
-            // Try the requested band, then step down, then wrap upwards.
-            int tryBand = band - attempt;
-            if (tryBand < 0) tryBand = band + attempt;
-            if (tryBand < 0 || tryBand > TOP_TIER) continue;
-
-            HullModSpecAPI picked = pickFrom(getEligible(tryBand), random);
-            if (picked != null) return picked;
-        }
-        return pickFrom(getEligible(-1), random);
-    }
-
-    private static HullModSpecAPI pickFrom(List<HullModSpecAPI> specs, Random random) {
+    public static HullModSpecAPI pickAny(Random random) {
+        List<HullModSpecAPI> specs = getEligible();
         if (specs.isEmpty()) return null;
+
         WeightedRandomPicker<HullModSpecAPI> picker = new WeightedRandomPicker<HullModSpecAPI>(random);
         for (HullModSpecAPI spec : specs) {
             float weight = spec.getRarity();
@@ -104,7 +78,7 @@ public class BlueprintPool {
 
     /** True once the machine has nothing left it is allowed to give. */
     public static boolean isExhausted() {
-        return getEligible(-1).isEmpty();
+        return getEligible().isEmpty();
     }
 
     /** Drops the blueprint chip into the player's hold. */

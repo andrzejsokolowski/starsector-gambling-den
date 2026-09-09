@@ -20,7 +20,7 @@ dependencies {
 
 jar {
     destinationDirectory = file('jars')
-    archiveFileName = 'HullmodDispenser.jar'
+    archiveFileName = 'GamblingDen.jar'
 }
 
 // Starsector's classloader refuses java.io, java.nio.file and java.lang.reflect to mod code, and the

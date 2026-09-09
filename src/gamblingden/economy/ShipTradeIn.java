@@ -1,4 +1,4 @@
-package hullmoddispenser.economy;
+package gamblingden.economy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +12,7 @@ import com.fs.starfarer.api.fleet.FleetMemberAPI;
 import com.fs.starfarer.api.impl.campaign.DModManager;
 import com.fs.starfarer.api.loading.HullModSpecAPI;
 
-import hullmoddispenser.Config;
+import gamblingden.Config;
 
 /** Turns surplus hulls, and blueprint chips you no longer need, into dispenser tokens. */
 public class ShipTradeIn {

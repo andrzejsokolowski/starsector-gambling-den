@@ -1,10 +1,10 @@
-package hullmoddispenser.slots;
+package gamblingden.slots;
 
 import com.fs.starfarer.api.campaign.CustomUIPanelPlugin;
 import com.fs.starfarer.api.campaign.CustomVisualDialogDelegate;
 import com.fs.starfarer.api.ui.CustomPanelAPI;
 
-/** Wraps the cabinet so the conversation can hand the screen over to it. */
+/** Wraps the machine so the conversation can hand the screen over to it. */
 public class SlotMachineDialogDelegate implements CustomVisualDialogDelegate {
 
     private final SlotMachinePanel machine;
@@ -33,6 +33,8 @@ public class SlotMachineDialogDelegate implements CustomVisualDialogDelegate {
 
     @Override
     public void advance(float amount) {
+        // The panel is ticked as a CustomUIPanelPlugin already; ticking it here too would
+        // run the reels at double speed.
     }
 
     @Override

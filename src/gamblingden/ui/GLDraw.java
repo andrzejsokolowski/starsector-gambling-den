@@ -1,4 +1,4 @@
-package hullmoddispenser.ui;
+package gamblingden.ui;
 
 import java.awt.Color;
 

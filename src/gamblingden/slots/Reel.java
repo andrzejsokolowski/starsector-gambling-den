@@ -1,17 +1,17 @@
-package hullmoddispenser.slots;
+package gamblingden.slots;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import com.fs.starfarer.api.loading.HullModSpecAPI;
+import gamblingden.prizes.Prize;
 
 /**
- * One spinning strip of icons.
+ * One spinning strip of symbols.
  *
- * The strip is a short list of symbols that slides downwards. Whenever it has slid a whole
- * slot's worth, the bottom symbol falls off and a new one is pushed in at the top, which makes
- * a short list look like an endless reel.
+ * The strip is a short list that slides downwards. Whenever it has slid a whole slot's worth,
+ * the bottom symbol falls off and a new one is pushed in at the top, which makes a short list
+ * look like an endless reel.
  *
  * The result is known before the reel starts slowing down, so stopping is a matter of pushing
  * the winning symbol in at exactly the right moment and letting it ride down to the pay line.
@@ -36,12 +36,12 @@ public class Reel {
     private static final float OVERSHOOT = 13f;
     private static final float BOUNCE_TIME = 0.16f;
 
-    public final List<HullModSpecAPI> strip = new ArrayList<HullModSpecAPI>();
+    public final List<Prize> strip = new ArrayList<Prize>();
 
     public float offset;
     public float speed;
 
-    public boolean spinning = true;
+    public boolean spinning;
     public boolean stopping;
     public boolean stopped;
     public boolean bouncing;
@@ -51,15 +51,15 @@ public class Reel {
 
     private final float slotHeight;
     private final float baseSpeed;
-    private final List<HullModSpecAPI> pool;
+    private final List<Prize> pool;
     private final Random random;
 
-    private HullModSpecAPI result;
+    private Prize result;
     private int shiftsLeft;
     private float bounceTimer;
     private float bounceFrom;
 
-    public Reel(List<HullModSpecAPI> pool, float slotHeight, float baseSpeed, Random random) {
+    public Reel(List<Prize> pool, float slotHeight, float baseSpeed, Random random) {
         this.pool = pool;
         this.slotHeight = slotHeight;
         this.baseSpeed = baseSpeed;
@@ -71,13 +71,13 @@ public class Reel {
         }
     }
 
-    private HullModSpecAPI randomSymbol() {
-        if (pool == null || pool.isEmpty()) return null;
+    private Prize randomSymbol() {
+        if (pool == null || pool.isEmpty()) return Prize.BUST;
         return pool.get(random.nextInt(pool.size()));
     }
 
     /** Tells the reel which symbol to land on and starts it slowing down. */
-    public void stopOn(HullModSpecAPI symbol) {
+    public void stopOn(Prize symbol) {
         if (!spinning) return;
         result = symbol;
         spinning = false;
@@ -97,7 +97,7 @@ public class Reel {
         stopped = true;
     }
 
-    public HullModSpecAPI getPayLineSymbol() {
+    public Prize getPayLineSymbol() {
         return strip.get(PAY_LINE);
     }
 
@@ -134,14 +134,12 @@ public class Reel {
                 shiftsLeft--;
             }
 
-            if (shiftsLeft <= 0) {
+            if (shiftsLeft <= 0 && offset >= OVERSHOOT) {
                 // The winning symbol is now on the pay line. Let the strip drift a little
                 // past centre, then spring back, so the reel lands with a knock.
-                if (offset >= OVERSHOOT) {
-                    bounceFrom = Math.min(offset, OVERSHOOT);
-                    bounceTimer = 0f;
-                    bouncing = true;
-                }
+                bounceFrom = Math.min(offset, OVERSHOOT);
+                bounceTimer = 0f;
+                bouncing = true;
             }
             return;
         }
@@ -157,7 +155,7 @@ public class Reel {
     }
 
     /** Pushes a symbol in at the top and lets the bottom one fall away. */
-    private void shift(HullModSpecAPI incoming) {
+    private void shift(Prize incoming) {
         strip.remove(strip.size() - 1);
         strip.add(0, incoming != null ? incoming : randomSymbol());
     }

@@ -1,7 +1,7 @@
 build/
 .gradle/
 gradle.properties
-# Root-anchored: an unanchored rule would also hide src/hullmoddispenser/ on
+# Root-anchored: an unanchored rule would also hide src/gamblingden/ on
 # case-insensitive Windows filesystems.
-/HullmodDispenser/
-/HullmodDispenser.zip
+/GamblingDen/
+/GamblingDen.zip

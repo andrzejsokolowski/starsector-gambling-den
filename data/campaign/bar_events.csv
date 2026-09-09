@@ -1,2 +1,2 @@
 bar event id,tags,freq,prob,min dur,max dur,min timeout,max timeout,min accepted timeout,max accepted timeout,plugin
-hmd_dispenser,,10,1,40,60,10,20,10,20,hullmoddispenser.bar.DispenserBarEvent
+gd_den,,10,1,40,60,10,20,10,20,gamblingden.bar.DenBarEvent

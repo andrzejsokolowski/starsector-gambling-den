@@ -1,13 +1,11 @@
-package hullmoddispenser.bar;
+package gamblingden.bar;
 
-import java.awt.Color;
 import java.util.List;
 import java.util.Map;
 
 import com.fs.starfarer.api.Global;
 import com.fs.starfarer.api.campaign.FleetMemberPickerListener;
 import com.fs.starfarer.api.campaign.InteractionDialogAPI;
-import com.fs.starfarer.api.campaign.TextPanelAPI;
 import com.fs.starfarer.api.campaign.econ.MarketAPI;
 import com.fs.starfarer.api.campaign.rules.MemoryAPI;
 import com.fs.starfarer.api.fleet.FleetMemberAPI;
@@ -15,25 +13,24 @@ import com.fs.starfarer.api.impl.campaign.ids.Factions;
 import com.fs.starfarer.api.impl.campaign.intel.bar.events.BaseBarEvent;
 import com.fs.starfarer.api.util.Misc;
 
-import hullmoddispenser.Config;
-import hullmoddispenser.economy.BlueprintPool;
-import hullmoddispenser.economy.ShipTradeIn;
-import hullmoddispenser.economy.TokenBank;
-import hullmoddispenser.slots.SlotMachineDialogDelegate;
-import hullmoddispenser.slots.SlotMachinePanel;
+import gamblingden.economy.ShipTradeIn;
+import gamblingden.economy.TokenBank;
+import gamblingden.slots.SlotMachine;
+import gamblingden.slots.SlotMachineDialogDelegate;
+import gamblingden.slots.SlotMachinePanel;
 
 /**
- * The back-room machine, and the person who keeps it fed.
+ * The den in the back of the bar, and the person who keeps it.
  *
- * Turns up in the bars of independent ports. Sells tokens for surplus hulls and for blueprint
- * chips you have already learned, and hands the screen over to the cabinet when you want to play.
+ * Turns up at independent ports. Buys surplus hulls and already-read blueprint chips for
+ * tokens, and hands the screen over to the machine when you want to play.
  */
-public class DispenserBarEvent extends BaseBarEvent {
+public class DenBarEvent extends BaseBarEvent {
 
-    private static final String OPTION_PLAY = "hmd_play";
-    private static final String OPTION_SELL_SHIP = "hmd_sell_ship";
-    private static final String OPTION_SELL_CHIPS = "hmd_sell_chips";
-    private static final String OPTION_LEAVE = "hmd_leave";
+    private static final String OPTION_PLAY = "gd_play";
+    private static final String OPTION_SELL_SHIP = "gd_sell_ship";
+    private static final String OPTION_SELL_CHIPS = "gd_sell_chips";
+    private static final String OPTION_LEAVE = "gd_leave";
 
     @Override
     public boolean shouldShowAtMarket(MarketAPI market) {
@@ -46,15 +43,14 @@ public class DispenserBarEvent extends BaseBarEvent {
     public void addPromptAndOption(InteractionDialogAPI dialog, Map<String, MemoryAPI> memoryMap) {
         super.addPromptAndOption(dialog, memoryMap);
 
-        dialog.getTextPanel().addPara("Wedged into the alcove past the heads is a machine the "
-                + "height of a Kite's landing strut, all scuffed brass and dead pixels. Three "
-                + "reels behind cracked glass, a chase of bulbs around the frame, half of them "
-                + "burnt out. A hand-lettered card reads: HULL MOD DISPENSER. NO REFUNDS. NO "
-                + "EXCEPTIONS. Someone is leaning against it with the proprietary air of a person "
+        dialog.getTextPanel().addPara("Past the heads, behind a curtain that used to be a "
+                + "thermal blanket, someone has set up a machine the height of a Kite's landing "
+                + "strut. Reels behind cracked glass, a chase of bulbs around the frame, half of "
+                + "them burnt out. A hand-lettered card reads: NO CREDIT. NO REFUNDS. NO "
+                + "EXCEPTIONS. The owner is leaning on it with the proprietary air of a person "
                 + "who owns exactly one thing.");
 
-        dialog.getOptionPanel().addOption(
-                "Take a closer look at the hull mod dispenser", this);
+        dialog.getOptionPanel().addOption("Have a look at the gambling den", this);
     }
 
     @Override
@@ -64,12 +60,13 @@ public class DispenserBarEvent extends BaseBarEvent {
 
         text.addPara("\"It eats hulls,\" the keeper says, before you can ask. \"Not credits. "
                 + "Credits it has seen. Bring me something you flew in on and do not want to fly "
-                + "out on, and I will give you tokens. Tokens go in the slot. Blueprints come "
-                + "out of the tray.\" A pause. \"Sometimes.\"");
+                + "out on, and I will give you tokens. Tokens go in the slot.\"");
 
-        text.addPara("\"It will not sell you a design you already know. That is not mercy, that "
-                + "is the wiring. And if you are carrying chips you have already read, I will "
-                + "take those too.\"");
+        text.addPara("\"Set it up however you like. More reels, more chances, more tokens. What "
+                + "comes out of the tray is what the reels say comes out of the tray - cash, "
+                + "cargo, guns, and if you are lucky, a box of hull mod work you have never seen "
+                + "before. It will not sell you a design you already know. That is not mercy, "
+                + "that is the wiring.\"");
 
         showMenu();
     }
@@ -80,20 +77,15 @@ public class DispenserBarEvent extends BaseBarEvent {
         options.clearOptions();
 
         int tokens = TokenBank.getTokens();
-        Color highlight = Misc.getHighlightColor();
-
-        text.addPara("You have %s.", highlight,
+        text.addPara("You have %s.", Misc.getHighlightColor(),
                 tokens + (tokens == 1 ? " token" : " tokens"));
 
-        options.addOption("Feed it a token and pull the handle", OPTION_PLAY);
-        if (tokens < Config.SPIN_COST) {
+        int cheapest = SlotMachine.costOf(1, 0);
+        options.addOption("Play the machine", OPTION_PLAY);
+        if (tokens < cheapest) {
             options.setEnabled(OPTION_PLAY, false);
-            options.setTooltip(OPTION_PLAY, "A pull costs " + Config.SPIN_COST
-                    + " tokens. You have " + tokens + ".");
-        } else if (BlueprintPool.isExhausted()) {
-            options.setEnabled(OPTION_PLAY, false);
-            options.setTooltip(OPTION_PLAY, "There is nothing left in the machine that you do "
-                    + "not already know.");
+            options.setTooltip(OPTION_PLAY, "The cheapest pull on the machine is " + cheapest
+                    + " tokens - one reel at low stakes. You have " + tokens + ".");
         }
 
         List<FleetMemberAPI> ships = ShipTradeIn.getTradeableShips();
@@ -113,7 +105,7 @@ public class DispenserBarEvent extends BaseBarEvent {
                     + (worth == 1 ? " token" : " tokens") + ")", OPTION_SELL_CHIPS);
         }
 
-        options.addOption("Leave the machine alone", OPTION_LEAVE);
+        options.addOption("Leave the den", OPTION_LEAVE);
     }
 
     @Override
@@ -145,14 +137,23 @@ public class DispenserBarEvent extends BaseBarEvent {
                 new SlotMachineDialogDelegate(machine, new Runnable() {
                     @Override
                     public void run() {
-                        afterPlaying();
+                        afterPlaying(machine);
                     }
                 }));
     }
 
-    private void afterPlaying() {
+    /** Reads back everything the machine actually handed over, itemised. */
+    private void afterPlaying(SlotMachinePanel machine) {
         if (text != null) {
-            text.addPara("You step back from the machine. The keeper does not look up.");
+            List<String> won = machine.getSessionLog();
+            if (won.isEmpty()) {
+                text.addPara("You step back from the machine no better off than you started.");
+            } else {
+                text.addPara("The tray rattles. Out of the machine, in total:");
+                for (String line : won) {
+                    text.addPara("   - " + line);
+                }
+            }
         }
         showMenu();
     }
@@ -196,11 +197,10 @@ public class DispenserBarEvent extends BaseBarEvent {
             total += ShipTradeIn.tradeIn(member);
         }
 
-        TextPanelAPI panel = text;
-        if (panel != null) {
-            panel.addPara("The keeper looks over " + names + ", names a number without "
-                    + "consulting anything, and counts out %s. Somewhere below the bar, a "
-                    + "cutting crew is already being paid.",
+        if (text != null) {
+            text.addPara("The keeper looks over " + names + ", names a number without consulting "
+                    + "anything, and counts out %s. Somewhere below the bar, a cutting crew is "
+                    + "already being paid.",
                     Misc.getHighlightColor(),
                     total + (total == 1 ? " token" : " tokens"));
         }
@@ -210,7 +210,7 @@ public class DispenserBarEvent extends BaseBarEvent {
 
     @Override
     public boolean shouldRemoveEvent() {
-        // The machine is a fixture. It stays until the bar event's own timer runs out.
+        // The den is a fixture. It goes away when the bar event's own timer runs out.
         return false;
     }
 }
