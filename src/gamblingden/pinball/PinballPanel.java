@@ -181,15 +181,19 @@ public final class PinballPanel extends BaseCustomUIPanelPlugin {
         if(events==null||dismissed) return;
         for(var e:events) if(!e.isConsumed()) {
             if(e.isKeyDownEvent()) {
-                int k=e.getEventValue();
-                if(k==Keyboard.KEY_ESCAPE) { e.consume();act("leave");return; }
-                if(k==Keyboard.KEY_LEFT) { keyLeft=true;e.consume(); }
-                if(k==Keyboard.KEY_RIGHT) { keyRight=true;e.consume(); }
-                if(k==Keyboard.KEY_SPACE) { if(!spaceDown) act("play");spaceDown=true;e.consume(); }
+                switch(e.getEventValue()) {
+                    case Keyboard.KEY_ESCAPE -> { e.consume();act("leave");return; }
+                    case Keyboard.KEY_LEFT -> { keyLeft=true;e.consume(); }
+                    case Keyboard.KEY_RIGHT -> { keyRight=true;e.consume(); }
+                    case Keyboard.KEY_SPACE -> { if(!spaceDown) act("play");spaceDown=true;e.consume(); }
+                }
             } else if(e.isKeyUpEvent()) {
-                if(e.getEventValue()==Keyboard.KEY_LEFT) { keyLeft=false;e.consume(); }
-                if(e.getEventValue()==Keyboard.KEY_RIGHT) { keyRight=false;e.consume(); }
-                if(e.getEventValue()==Keyboard.KEY_SPACE) { spaceDown=false;e.consume(); }
+                // Read once: Starsector rejects getEventValue() after consume().
+                switch(e.getEventValue()) {
+                    case Keyboard.KEY_LEFT -> { keyLeft=false;e.consume(); }
+                    case Keyboard.KEY_RIGHT -> { keyRight=false;e.consume(); }
+                    case Keyboard.KEY_SPACE -> { spaceDown=false;e.consume(); }
+                }
             }
         }
     }

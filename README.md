@@ -270,6 +270,13 @@ If `fr.jar` is installed in `starsector-core`, the checks also send 3,000 panel 
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
 
+## Changes in 1.6.1
+
+Fixes the Pinball crash when you release the left or right arrow key.
+The input handler no longer reads a key event after it marks that event as handled.
+Tests now cover arrow presses and releases, both flippers held together, Space, and Escape.
+Game rules, rewards, and mouse controls are unchanged.
+
 ## Changes in 1.6.0
 
 Adds Pinball: three balls per entry, real moving flippers, bumpers, target combos, a loop,

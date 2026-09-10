@@ -16,6 +16,7 @@ import com.fs.starfarer.api.combat.ShipHullSpecAPI;
 import com.fs.starfarer.api.combat.WeaponAPI.*;
 import com.fs.starfarer.api.fleet.FleetMemberAPI;
 import com.fs.starfarer.api.input.InputEventAPI;
+import com.fs.starfarer.api.input.InputEventType;
 import com.fs.starfarer.api.graphics.SpriteAPI;
 import com.fs.starfarer.api.loading.*;
 import com.fs.starfarer.api.ui.*;
@@ -351,9 +352,21 @@ public class RegressionChecks {
         panel.positionChanged(position); return panel;
     }
     private static InputEventAPI key(int code) {
+        return key(code,InputEventType.KEY_DOWN);
+    }
+    private static InputEventAPI key(int code,InputEventType type) {
+        // Match the game's consumed-event guard, including key-up events.
+        boolean[] consumed={false};
         return proxy(InputEventAPI.class,(m,a)->switch(m.getName()) {
-            case "isKeyDownEvent" -> true;
-            case "getEventValue" -> code;
+            case "isConsumed" -> consumed[0];
+            case "consume" -> { consumed[0]=true;yield null; }
+            case "isKeyboardEvent" -> true;
+            case "isKeyDownEvent" -> type==InputEventType.KEY_DOWN;
+            case "isKeyUpEvent" -> type==InputEventType.KEY_UP;
+            case "getEventValue","getEventType","isRepeat" -> {
+                if(consumed[0]) throw new RuntimeException("Attempt to access data of a consumed InputEvent");
+                yield m.getName().equals("getEventValue")?code:m.getName().equals("getEventType")?type:type==InputEventType.KEY_REPEAT;
+            }
             default -> null;
         });
     }
@@ -1442,6 +1455,63 @@ public class RegressionChecks {
         jackpotDefaults();recordIcons=false;
     }
 
+    private static void pinballKeyboard() throws Exception {
+        reset();TokenBank.addTokens(100);
+        var guard=key(Keyboard.KEY_LEFT);guard.consume();
+        boolean rejected=false;
+        try { guard.getEventValue(); } catch(RuntimeException e) {
+            rejected="Attempt to access data of a consumed InputEvent".equals(e.getMessage());
+        }
+        check(rejected,"Input fixture did not reproduce Starsector's consumed-event guard");
+        var panel=(PinballPanel)machine(PinballPanel.class);
+        ((Random)get(panel,"random")).setSeed(1);
+        panel.processInput(null);
+        panel.processInput(List.of(guard));
+        check(!(Boolean)get(panel,"keyLeft"),"Already-consumed key changed a flipper");
+        var space=key(Keyboard.KEY_SPACE);
+        panel.processInput(List.of(space));
+        var game=(PinballGame)get(panel,"game");
+        check(space.isConsumed()&&game!=null&&game.board().ready()&&TokenBank.getTokens()==90,"Space did not buy one round");
+        panel.processInput(List.of(key(Keyboard.KEY_SPACE),key(Keyboard.KEY_SPACE,InputEventType.KEY_REPEAT)));
+        check(game.board().ready()&&TokenBank.getTokens()==90,"Held Space launched or charged again");
+        var spaceUp=key(Keyboard.KEY_SPACE,InputEventType.KEY_UP);
+        panel.processInput(List.of(spaceUp));
+        check(spaceUp.isConsumed()&&!(Boolean)get(panel,"spaceDown"),"Space release did not clear its latch");
+        panel.processInput(List.of(key(Keyboard.KEY_SPACE),key(Keyboard.KEY_SPACE,InputEventType.KEY_UP)));
+        check(game.board().playing()&&TokenBank.getTokens()==90,"Space did not launch the paid ball");
+        for(int cycle=0;cycle<20;cycle++) {
+            var left=key(Keyboard.KEY_LEFT);var right=key(Keyboard.KEY_RIGHT);
+            panel.processInput(List.of(left,right));
+            check(left.isConsumed()&&right.isConsumed()&&(Boolean)get(panel,"keyLeft")&&(Boolean)get(panel,"keyRight"),
+                    "Simultaneous arrow presses failed");
+            panel.advance(.06f);
+            check(game.board().flipperRail(true).y2()<468&&game.board().flipperRail(false).y2()<468,"Arrows did not raise both flippers");
+            int first=cycle%2==0?Keyboard.KEY_LEFT:Keyboard.KEY_RIGHT;
+            int second=first==Keyboard.KEY_LEFT?Keyboard.KEY_RIGHT:Keyboard.KEY_LEFT;
+            var firstUp=key(first,InputEventType.KEY_UP);
+            panel.processInput(List.of(firstUp));
+            check(firstUp.isConsumed()&&(Boolean)get(panel,"keyLeft")== (first!=Keyboard.KEY_LEFT)
+                    &&(Boolean)get(panel,"keyRight")== (first!=Keyboard.KEY_RIGHT),"Release cleared the wrong arrow");
+            var secondUp=key(second,InputEventType.KEY_UP);
+            panel.processInput(List.of(firstUp,secondUp));
+            check(secondUp.isConsumed()&&!(Boolean)get(panel,"keyLeft")&&!(Boolean)get(panel,"keyRight"),"Arrow releases left a flipper held");
+            panel.advance(.13f);
+            check(game.board().flipperRail(true).y2()>468&&game.board().flipperRail(false).y2()>468,"Released arrows did not lower the flippers");
+        }
+        for(var type:List.of(InputEventType.KEY_DOWN,InputEventType.KEY_UP,InputEventType.KEY_REPEAT)) {
+            var unrelated=key(Keyboard.KEY_A,type);panel.processInput(List.of(unrelated));
+            check(!unrelated.isConsumed(),"Pinball swallowed an unrelated key");
+        }
+        panel.processInput(List.of(key(Keyboard.KEY_LEFT),key(Keyboard.KEY_RIGHT)));
+        var escape=key(Keyboard.KEY_ESCAPE);
+        panel.processInput(List.of(escape,key(Keyboard.KEY_SPACE)));
+        check(escape.isConsumed()&&game.finished()&&dismissals==1&&!(Boolean)get(panel,"keyLeft")&&!(Boolean)get(panel,"keyRight"),
+                "Escape failed to close with held flippers");
+        int balance=TokenBank.getTokens();
+        panel.processInput(List.of(key(Keyboard.KEY_LEFT,InputEventType.KEY_UP),key(Keyboard.KEY_RIGHT,InputEventType.KEY_UP),key(Keyboard.KEY_SPACE)));
+        check(TokenBank.getTokens()==balance&&dismissals==1,"Closed table accepted keys or paid again");
+        System.out.println("PASS: consumed-event guard, arrow press/release cycles, Space, and Escape.");
+    }
     private static void pinballStock() {
         for(int i=0;i<20;i++) hullmods.add(hullmod("pinball_"+i,1));
         weapons.add(weapon("pinball_gun",1,false));fighterSpecs.add(fighter("pinball_wing",1));
@@ -1558,13 +1628,14 @@ public class RegressionChecks {
     }
 
     public static void main(String[] args) throws Exception {
-        if(args.length>0&&args[0].equals("pinball")) { setup();pinball();PinballPhysicsChecks.run();return; }
+        if(args.length>0&&args[0].equals("pinball-keyboard")) { setup();pinballKeyboard();return; }
+        if(args.length>0&&args[0].equals("pinball")) { setup();pinballKeyboard();pinball();PinballPhysicsChecks.run();return; }
         if(args.length>0 && args[0].equals("background")) { setup();pachinkoBackground();return; }
         if(args.length>0 && args[0].equals("fast-renderer")) {
             setup(); FastRendererChecks.run(RegressionChecks::machine); return;
         }
         setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
-        PachinkoPhysicsChecks.run(); PachinkoPhysicsChecks.multiBall(); pachinko(); pachinkoSettings(); pachinkoBatches();
+        pinballKeyboard();PachinkoPhysicsChecks.run(); PachinkoPhysicsChecks.multiBall(); pachinko(); pachinkoSettings(); pachinkoBatches();
         pachinkoBackground(); pachinkoCredits(); boxDefaults(); PachinkoBalanceChecks.run(); pinball();PinballPhysicsChecks.run();
         BlackjackChecks.run(); blackjackUI(); blackjackCardArt(); expandedRewards(); jackpot();
         FastRendererChecks.run(RegressionChecks::machine);
