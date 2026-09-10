@@ -80,7 +80,7 @@ public final class PachinkoPreview {
             g.drawString(c.text,c.x+(c.w-fm.stringWidth(c.text))/2,c.y+fm.getAscent());
         }
         g.dispose();
-        File output=new File("build/"+(panel instanceof PachinkoPanel?"pachinko-":panel instanceof gamblingden.jackpot.JackpotPanel?"jackpot-":"blackjack-")+name+(previewScale==1?"":"-"+previewScale+"x")+".png"); output.getParentFile().mkdirs();
+        File output=new File("build/"+(panel instanceof gamblingden.pinball.PinballPanel?"pinball-":panel instanceof PachinkoPanel?"pachinko-":panel instanceof gamblingden.jackpot.JackpotPanel?"jackpot-":"blackjack-")+name+(previewScale==1?"":"-"+previewScale+"x")+".png"); output.getParentFile().mkdirs();
         ImageIO.write(image,"png",output);
         System.out.println(output.getAbsolutePath());
     }
@@ -104,6 +104,7 @@ public final class PachinkoPreview {
             blackjack(ui);return;
         }
         if(args.length>0 && args[0].equals("jackpot")) { jackpot(ui); return; }
+        if(args.length>0 && args[0].equals("pinball")) { pinball(ui); return; }
         boolean anime=args.length>0 && args[0].equals("anime");
         if(anime) {
             SettingsAPI base=Global.getSettings();
@@ -145,6 +146,34 @@ public final class PachinkoPreview {
             TokenBank.addTokens(1000);act.invoke(panel,"drop50");
             for(int frame=0;frame<80;frame++) panel.advance(1f/60);
             save(panel,"credits-falling");act.invoke(panel,"skip");save(panel,"credits-paid");
+        } finally { buffer.destroy(); }
+    }
+
+    private static void pinball(CustomPanelAPI ui) throws Exception {
+        var panel=new gamblingden.pinball.PinballPanel();panel.init(ui,null);
+        Caption bounds=new Caption();bounds.w=1000;bounds.h=660;panel.positionChanged(position(bounds));
+        Method act=panel.getClass().getDeclaredMethod("act",String.class);act.setAccessible(true);
+        Method pointer=panel.getClass().getDeclaredMethod("pointer",float.class,float.class,boolean.class,boolean.class);pointer.setAccessible(true);
+        Field gameField=panel.getClass().getDeclaredField("game");gameField.setAccessible(true);
+        Field rng=panel.getClass().getDeclaredField("random");rng.setAccessible(true);((Random)rng.get(panel)).setSeed(9871);
+        Pbuffer buffer=new Pbuffer(1000,660,new PixelFormat(),null);
+        try {
+            buffer.makeCurrent();GL11.glViewport(0,0,1000,660);
+            GL11.glMatrixMode(GL11.GL_PROJECTION);GL11.glLoadIdentity();GL11.glOrtho(0,1000,0,660,-1,1);
+            GL11.glMatrixMode(GL11.GL_MODELVIEW);GL11.glLoadIdentity();
+            save(panel,"ready");act.invoke(panel,"play");save(panel,"paid");act.invoke(panel,"play");
+            for(int frame=0;frame<3000;frame++) {
+                var game=(gamblingden.pinball.PinballGame)gameField.get(panel);var ball=game.board();
+                if(game.finished()) break;
+                if(ball.ready()) act.invoke(panel,"play");
+                boolean flip=ball.y()>435&&ball.vy()>0;
+                pointer.invoke(panel,500f,420f,flip&&ball.x()<270,flip&&ball.x()>190);
+                panel.advance(1f/120);
+                if(frame==90) save(panel,"playing");
+                if(frame==1100) save(panel,"score");
+            }
+            pointer.invoke(panel,500f,420f,false,false);act.invoke(panel,"collect");save(panel,"collected");
+            act.invoke(panel,"category:HULLMODS");save(panel,"hullmods");
         } finally { buffer.destroy(); }
     }
 

@@ -1,12 +1,12 @@
 # Gambling Den
 
 A back-room gambling den at every port of size 6 or more. Sell surplus hulls for tokens,
-then play Slots, Pachinko, Blackjack, or Relic Jackpot.
+then play Slots, Pachinko, Pinball, Blackjack, or Relic Jackpot.
 
 Gathering hull mods from salvage is slow. This gives you something else to do with the pile of
 recovered frigates you are never going to fly.
 
-Gambling Den is the venue, not the name of a machine. All four games share the den
+Gambling Den is the venue, not the name of a machine. All five games share the den
 and token balance, with their own rules. Poker is planned for a later update.
 
 ## How it works
@@ -61,7 +61,7 @@ Every action has a button. Space pulls and Escape leaves, but neither is the onl
 Choose **Hullmods**, **Weapons**, **Tokens**, or **Credits**, then drop **1, 10 or 50 balls**. Keep buying
 balls while earlier ones are falling. Each button shows the full cost of its batch; purchases
 are all-or-nothing. Default prices per ball are 4 tokens for hullmods, 2 for weapons, and 1
-for tokens; credit balls cost 2 tokens. Balls feed rapidly from the centre, bouncing off ten rows of pegs and each other.
+for tokens; credit balls cost 5 tokens. Balls feed rapidly from the centre, bouncing off ten rows of pegs and each other.
 The board allows up to 100 falling or queued balls at once. Landed balls free room for more.
 
 Weapon pocket amounts, from left to right, are:
@@ -70,7 +70,7 @@ Weapon pocket amounts, from left to right, are:
 
 Token pocket amounts are:
 
-`12 | 3 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 3 | 12`
+`60 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 | 60`
 
 Credit pocket amounts are:
 
@@ -79,8 +79,10 @@ Credit pocket amounts are:
 Credit pockets pay those exact amounts; the Slots credit percentage does not apply.
 Credits enter your balance on landing and are not paid again on exit.
 The token layout has its own sliders, so previously saved weapon payouts do not override it.
-In 30,000-ball samples per play mode, it returned about 0.78–0.96 tokens per one-token ball,
-including 0.9592 during continuous play with up to 100 balls.
+The middle seven pockets pay nothing. The outside pockets pay 8 or 60 tokens, making wins rare
+and much larger. In 30,000-ball samples per play mode, about 95–97% of balls paid nothing.
+The average return ranged from 0.63–0.96 tokens per one-token ball, including 0.9281 during
+continuous play. Payout variance was over twenty times that of the previous token layout.
 These are simulation results, not a guarantee for an individual run.
 
 Hullmod pocket amounts are:
@@ -122,6 +124,43 @@ board without charging; click again to accept it.
 
 Category choices are mutually exclusive and stay locked while balls remain. All actions are
 clickable. Space adds one ball, including during a run; Escape leaves. There are no tutorial panels.
+
+## Pinball
+
+Choose Hullmods, Weapons, Fighters, Credits, or Tokens before paying the entry price.
+The default entry is 10 tokens for three balls. Each ball needs a Launch click.
+Your final score pays the highest reward tier reached; the rows do not add together.
+
+| Score | Blueprints | Weapons | Fighter LPCs | Credits | Tokens |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 2,000 | 1 | 2 | 1 | 10,000 | 5 |
+| 6,000 | 2 | 5 | 2 | 30,000 | 15 |
+| 12,000 | 4 | 12 | 4 | 75,000 | 35 |
+| 24,000 | 8 | 25 | 8 | 200,000 | 80 |
+
+Below the first threshold, there is no prize. You receive only the chosen category.
+Pinball pays direct item counts, unaffected by the Slots box percentage or crate-size sliders.
+The displayed blueprint rewards are capped to the eligible stock available before entry.
+
+Over the playfield, hold the left or right mouse button to power that flipper.
+Both can be held together. Each flipper also has a button that works with a left click.
+The arrow keys are optional alternatives, and Space operates Play or Launch.
+Moving paddles transfer momentum to the ball; holding them up is not the same as timing a flip.
+
+Bumpers score 100, slingshots 35, and round targets 250 before the multiplier.
+Lighting all three targets adds a 1,000-point bonus and raises the multiplier, up to 3x.
+The upper-left loop scores 500. Nudge pushes the ball, but repeated nudges cause tilt:
+flippers and scoring stop for that ball. The nudge meter cools over time.
+Already-earned points remain, and the next ball resets tilt and the multiplier.
+
+Drain ball forfeits the current ball and prepares the next one. End & collect ends the round
+early, giving up unused balls and paying the prize earned so far. The third drained ball ends
+the round automatically. End & leave, Escape, and an external closure also settle the score once.
+There are no refunds or automatic play of unused balls. Rewards are generated only when the round ends.
+
+The Pinball tab in LunaLib controls entry price, four score thresholds, and each category's
+reward quantities. A paid round keeps its displayed paytable if settings change.
+If a new entry quote has changed, the first Play click refreshes it without charging.
 
 ## Blackjack
 
@@ -196,7 +235,7 @@ therefore pay 1/3/5. Set it to 100% to use the base counts unchanged.
 Weapons, fighter crates, win chances, and already-won boxes are unaffected.
 
 The **Pachinko** tab has separate ball-price sliders and six pocket sliders for each category.
-Weapon, hullmod, and token pockets range from 0–100; credit pockets range from 0–2,000,000.
+Weapon and hullmod pockets range from 0–100, token pockets from 0–1,000, and credits from 0–2,000,000.
 Each amount applies symmetrically at the same distance from the centre.
 Changing one category's pocket settings does not affect another.
 They do not use the Slots crate-size sliders. A purchased ball keeps its quoted price and
@@ -204,7 +243,8 @@ pocket amounts if settings change during its fall.
 
 Anime mode, in the same tab, adds an optional illustrated background. It is off by default.
 Reopen the Pachinko screen after switching it. It changes no costs, odds, or ball physics.
-The token-ball price now uses a new setting so the previous saved 2-token default becomes 1.
+The credit-ball price and risky token pockets use new setting keys, so saved values from the
+older two-token credit price and stable token board do not override the new defaults.
 
 **`data/config/gambling_den.json`** holds the deeper wiring — reel costs, the reel strip weights
 for all four stakes, the payout variance and the double-or-nothing chance. Edit and reload a
@@ -226,9 +266,25 @@ offscreen graphics; they do not open or change a live game. The graphics checks 
 game's Windows native libraries. Run `./gradlew releaseZip` to check, build and package the mod
 with both icon sizes into `GamblingDen.zip`.
 
-If `fr.jar` is installed in `starsector-core`, the checks also send 2,400 panel frames through
+If `fr.jar` is installed in `starsector-core`, the checks also send 3,000 panel frames through
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
+
+## Changes in 1.6.0
+
+Adds Pinball: three balls per entry, real moving flippers, bumpers, target combos, a loop,
+nudging and tilt, and score-based rewards in a chosen category. All actions work with the mouse.
+Entry defaults to 10 tokens. Paytables and price have LunaLib controls.
+
+Token Pachinko now pays 60/8/0/0/0/0/0/0/0/8/60 at one token per ball.
+More than 95% of balls paid nothing in the tested play modes, with occasional much larger wins.
+The existing ten-row physics is unchanged; only the token paytable changes.
+Credits Pachinko now costs 5 tokens per ball, including on upgrades from the old saved default.
+Its credit rewards are unchanged, as are the weapon and hullmod boards.
+
+Checks cover flipper timing versus passive play, frame-rate consistency, tilt, all reward
+tiers and categories, mouse controls, safe exits, 150,000 Pachinko balls, and Fast Rendering.
+Offscreen previews were inspected. Pinball still needs an in-game playtest.
 
 ## Changes in 1.5.0
 

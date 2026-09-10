@@ -32,14 +32,14 @@ gd_pachinko_cost_hullmods,Hullmod ball price,Int,4,,Tokens paid for one ball on 
 gd_pachinko_cost_weapons,Weapon ball price,Int,2,,Tokens paid for one ball on the weapon board.,1,1000,Pachinko
 gd_pachinko_token_price,Token ball price,Int,1,,Tokens paid for one ball on the token board.,1,1000,Pachinko
 gd_pachinko_anime_mode,Anime mode,Boolean,false,,Show an anime background. Reopen Pachinko to apply.,,,Pachinko
-gd_pachinko_cost_credits,Credit ball price,Int,2,,Tokens paid for one ball on the credit board.,1,1000,Pachinko
+gd_pachinko_credit_price,Credit ball price,Int,5,,Tokens paid for one ball on the credit board.,1,1000,Pachinko
 gd_pachinko_header_tokens,Token pockets,Header,Token pockets,,,,,Pachinko
-gd_pachinko_token_pocket_0,Tokens - centre pocket,Int,0,,Tokens paid by the centre pocket.,0,100,Pachinko
-gd_pachinko_token_pocket_1,Tokens - one from centre,Int,1,,Tokens paid one pocket from the centre.,0,100,Pachinko
-gd_pachinko_token_pocket_2,Tokens - two from centre,Int,1,,Tokens paid two pockets from the centre.,0,100,Pachinko
-gd_pachinko_token_pocket_3,Tokens - three from centre,Int,1,,Tokens paid three pockets from the centre.,0,100,Pachinko
-gd_pachinko_token_pocket_4,Tokens - four from centre,Int,3,,Tokens paid four pockets from the centre.,0,100,Pachinko
-gd_pachinko_token_pocket_5,Tokens - outer pockets,Int,12,,Tokens paid at either edge.,0,100,Pachinko
+gd_pachinko_risky_token_pocket_0,Tokens - centre pocket,Int,0,,Tokens paid by the centre pocket.,0,1000,Pachinko
+gd_pachinko_risky_token_pocket_1,Tokens - one from centre,Int,0,,Tokens paid one pocket from the centre.,0,1000,Pachinko
+gd_pachinko_risky_token_pocket_2,Tokens - two from centre,Int,0,,Tokens paid two pockets from the centre.,0,1000,Pachinko
+gd_pachinko_risky_token_pocket_3,Tokens - three from centre,Int,0,,Tokens paid three pockets from the centre.,0,1000,Pachinko
+gd_pachinko_risky_token_pocket_4,Tokens - four from centre,Int,8,,Tokens paid four pockets from the centre.,0,1000,Pachinko
+gd_pachinko_risky_token_pocket_5,Tokens - outer pockets,Int,60,,Tokens paid at either edge.,0,1000,Pachinko
 gd_pachinko_header_credits,Credit pockets,Header,Credit pockets,,,,,Pachinko
 gd_pachinko_credit_pocket_0,Credits - centre pocket,Int,0,,Credits paid by the centre pocket.,0,2000000,Pachinko
 gd_pachinko_credit_pocket_1,Credits - one from centre,Int,500,,Credits paid one pocket from the centre.,0,2000000,Pachinko
@@ -65,3 +65,29 @@ gd_jackpot_header,Match rates,Header,Match rates,,,,,Relic Jackpot
 gd_jackpot_match_2,Match chance - 2 tokens per reel,Int,15,,Percent of pulls that award one item from the 2-token tier.,0,100,Relic Jackpot
 gd_jackpot_match_4,Match chance - 4 tokens per reel,Int,20,,Percent of pulls that award one item from the 4-token tier.,0,100,Relic Jackpot
 gd_jackpot_match_8,Match chance - 8 tokens per reel,Int,25,,Percent of pulls that award one item from the 8-token tier.,0,100,Relic Jackpot
+gd_pinball_header,Pinball,Header,Pinball,,,,,Pinball
+gd_pinball_price,Three-ball entry price,Int,10,,Tokens paid for a three-ball pinball round.,1,1000,Pinball
+gd_pinball_score_0,Score threshold 1,Int,2000,,Score needed for reward tier 1. Thresholds remain increasing.,1,1000000,Pinball
+gd_pinball_score_1,Score threshold 2,Int,6000,,Score needed for reward tier 2. Thresholds remain increasing.,1,1000000,Pinball
+gd_pinball_score_2,Score threshold 3,Int,12000,,Score needed for reward tier 3. Thresholds remain increasing.,1,1000000,Pinball
+gd_pinball_score_3,Score threshold 4,Int,24000,,Score needed for reward tier 4. Thresholds remain increasing.,1,1000000,Pinball
+gd_pinball_hullmods_0,Hullmods - tier 1,Int,1,,Direct hullmods paid for reward tier 1. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_hullmods_1,Hullmods - tier 2,Int,2,,Direct hullmods paid for reward tier 2. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_hullmods_2,Hullmods - tier 3,Int,4,,Direct hullmods paid for reward tier 3. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_hullmods_3,Hullmods - tier 4,Int,8,,Direct hullmods paid for reward tier 4. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_weapons_0,Weapons - tier 1,Int,2,,Direct weapons paid for reward tier 1. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_weapons_1,Weapons - tier 2,Int,5,,Direct weapons paid for reward tier 2. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_weapons_2,Weapons - tier 3,Int,12,,Direct weapons paid for reward tier 3. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_weapons_3,Weapons - tier 4,Int,25,,Direct weapons paid for reward tier 4. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_fighters_0,Fighters - tier 1,Int,1,,Direct fighters paid for reward tier 1. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_fighters_1,Fighters - tier 2,Int,2,,Direct fighters paid for reward tier 2. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_fighters_2,Fighters - tier 3,Int,4,,Direct fighters paid for reward tier 3. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_fighters_3,Fighters - tier 4,Int,8,,Direct fighters paid for reward tier 4. Not affected by Slots crate settings.,0,100,Pinball
+gd_pinball_credits_0,Credits - tier 1,Int,10000,,Direct credits paid for reward tier 1. Not affected by Slots crate settings.,0,2000000,Pinball
+gd_pinball_credits_1,Credits - tier 2,Int,30000,,Direct credits paid for reward tier 2. Not affected by Slots crate settings.,0,2000000,Pinball
+gd_pinball_credits_2,Credits - tier 3,Int,75000,,Direct credits paid for reward tier 3. Not affected by Slots crate settings.,0,2000000,Pinball
+gd_pinball_credits_3,Credits - tier 4,Int,200000,,Direct credits paid for reward tier 4. Not affected by Slots crate settings.,0,2000000,Pinball
+gd_pinball_tokens_0,Tokens - tier 1,Int,5,,Direct tokens paid for reward tier 1. Not affected by Slots crate settings.,0,1000000,Pinball
+gd_pinball_tokens_1,Tokens - tier 2,Int,15,,Direct tokens paid for reward tier 2. Not affected by Slots crate settings.,0,1000000,Pinball
+gd_pinball_tokens_2,Tokens - tier 3,Int,35,,Direct tokens paid for reward tier 3. Not affected by Slots crate settings.,0,1000000,Pinball
+gd_pinball_tokens_3,Tokens - tier 4,Int,80,,Direct tokens paid for reward tier 4. Not affected by Slots crate settings.,0,1000000,Pinball

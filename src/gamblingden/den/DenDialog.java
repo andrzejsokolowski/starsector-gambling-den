@@ -94,6 +94,7 @@ public class DenDialog implements InteractionDialogPlugin {
         }
 
         options.addOption("Play pachinko", OPTION_PACHINKO);
+        options.addOption("Play pinball", "gd_pinball");
         options.addOption("Play blackjack", OPTION_BLACKJACK);
         options.addOption("Play Relic Jackpot", "gd_jackpot");
 
@@ -122,6 +123,14 @@ public class DenDialog implements InteractionDialogPlugin {
                             for (String line : game.getSessionLog()) text.addPara(line);
                             showMenu();
                         }
+                    }));
+
+        } else if ("gd_pinball".equals(optionData)) {
+            final var game=new gamblingden.pinball.PinballPanel();
+            dialog.showCustomVisualDialog(game.PANEL_W,game.PANEL_H,
+                    new gamblingden.pinball.PinballDialogDelegate(game,()->{
+                        for(String line:game.getSessionLog()) text.addPara(line);
+                        showMenu();
                     }));
 
         } else if (OPTION_BLACKJACK.equals(optionData)) {

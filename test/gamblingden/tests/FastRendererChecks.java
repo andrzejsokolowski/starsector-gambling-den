@@ -163,6 +163,33 @@ final class FastRendererChecks {
                 drain(exec,swap);update.invoke(detector);
             }
 
+            Class<?> pinballType=new BridgeLoader().loadClass("gamblingden.pinball.PinballPanel");
+            BaseCustomUIPanelPlugin pinball=factory.create(pinballType);
+            Method pinballAct=pinballType.getDeclaredMethod("act",String.class);pinballAct.setAccessible(true);
+            Method pinballPointer=pinballType.getDeclaredMethod("pointer",float.class,float.class,boolean.class,boolean.class);pinballPointer.setAccessible(true);
+            gamblingden.economy.TokenBank.addTokens(1000);
+            for(int frame=0;frame<600;frame++) {
+                if(frame%150==0||frame%150==1) pinballAct.invoke(pinball,"play");
+                if(frame%150==90) pinballAct.invoke(pinball,"drain");
+                if(frame%150==120) pinballAct.invoke(pinball,"collect");
+                pinballPointer.invoke(pinball,500f,420f,frame%40<5,frame%60<5);
+                pinball.advance(1f/60);
+                boolean clipped=frame%2==0;
+                enqueue.invoke(exec,(Runnable)()->{
+                    if(clipped) GL11.glEnable(GL11.GL_SCISSOR_TEST);else GL11.glDisable(GL11.GL_SCISSOR_TEST);
+                    GL11.glScissor(15,20,1100,700);
+                });
+                pinball.renderBelow(1f);
+                if(stalled.getBoolean(detector)) throw new AssertionError("Pinball forced a pipeline stall");
+                enqueue.invoke(exec,(Runnable)()->{
+                    IntBuffer rect=BufferUtils.createIntBuffer(16);GL11.glGetInteger(GL11.GL_SCISSOR_BOX,rect);
+                    if(GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)!=clipped||rect.get(0)!=15||rect.get(2)!=1100)
+                        throw new AssertionError("Pinball clipping leaked");
+                    if(GL11.glGetError()!=GL11.GL_NO_ERROR) throw new AssertionError("Pinball OpenGL error");
+                });
+                drain(exec,swap);update.invoke(detector);
+            }
+
             // Positive control: the exact v0.4.2 query must reproduce the reported fatal
             // exception. Otherwise this harness is not actually testing the failing path.
             Class<?> bridge=Class.forName("com.genir.renderer.bridge.GL11");
@@ -177,7 +204,7 @@ final class FastRendererChecks {
                 update.invoke(detector);
             }
             if(!reproduced) throw new AssertionError("Old crash condition was not reproduced");
-            System.out.println("PASS: Fast Rendering bridge: 2400 panel frames (600 per game) without stalls or clipping leaks; v0.4.2 crash reproduced by control.");
+            System.out.println("PASS: Fast Rendering bridge: 3000 panel frames (600 per game) without stalls or clipping leaks; v0.4.2 crash reproduced by control.");
         } finally {
             try {
                 enqueue.invoke(exec,(Runnable)()->{
@@ -204,6 +231,7 @@ final class FastRendererChecks {
         @Override protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
             if(!name.equals("gamblingden.slots.SlotMachinePanel") && !name.startsWith("gamblingden.slots.SlotMachinePanel$")
                     && !name.startsWith("gamblingden.pachinko.")
+                    && !name.startsWith("gamblingden.pinball.")
                     && !name.startsWith("gamblingden.blackjack.")
                     && !name.startsWith("gamblingden.jackpot.")
                     && !name.equals("gamblingden.ui.GLDraw")) return super.loadClass(name,resolve);

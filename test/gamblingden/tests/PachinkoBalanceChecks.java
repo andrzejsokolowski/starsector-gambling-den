@@ -11,17 +11,23 @@ public final class PachinkoBalanceChecks {
         return ball;
     }
     private static void report(String mode,int[] histogram) {
-        int[][] layouts={{0,1,2,4,8,16},{0,1,1,2,7,21},{0,1,1,1,3,12}};
+        int[][] layouts={{0,1,1,1,3,12},{0,0,0,0,8,60}};
         int count=java.util.Arrays.stream(histogram).sum();
-        double[] means=new double[3];
+        double[] means=new double[2],variance=new double[2];int wins=0;
         for(int l=0;l<layouts.length;l++) {
-            long total=0;
-            for(int i=0;i<11;i++) total+=(long)histogram[i]*layouts[l][Math.abs(i-5)];
+            long total=0,squares=0;
+            for(int i=0;i<11;i++) {
+                int amount=layouts[l][Math.abs(i-5)];
+                total+=(long)histogram[i]*amount;squares+=(long)histogram[i]*amount*amount;
+                if(l==1&&amount>0) wins+=histogram[i];
+            }
             means[l]=total/(double)count;
+            variance[l]=squares/(double)count-means[l]*means[l];
         }
-        System.out.printf(java.util.Locale.ROOT,"Token balance, %s, %d balls: old %.4f, proposed %.4f, new %.4f tokens/ball%n",
-                mode,count,means[0],means[1],means[2]);
-        if(means[2]<.75 || means[2]>=1) throw new AssertionError("Token board return outside target: "+mode+" "+means[2]);
+        System.out.printf(java.util.Locale.ROOT,"Risky tokens, %s, %d balls: %.4f tokens/ball, %.2f%% blank, %.1fx previous variance%n",
+                mode,count,means[1],100d*(count-wins)/count,variance[1]/variance[0]);
+        if(means[1]<.55||means[1]>=1||wins/(double)count>.06||variance[1]<variance[0]*8)
+            throw new AssertionError("Risky board does not meet its return/volatility targets");
     }
     public static void run() {
         for(int size:new int[]{1,10,50,100}) {

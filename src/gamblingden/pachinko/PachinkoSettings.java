@@ -10,7 +10,7 @@ public final class PachinkoSettings {
         HULLMODS("Hullmods", "hullmods", 4, new Color(135, 200, 245)),
         WEAPONS("Weapons", "weapons", 2, new Color(220, 150, 100)),
         TOKENS("Tokens", "tokens", 1, new Color(135, 220, 165)),
-        CREDITS("Credits", "credits", 2, new Color(245, 205, 110));
+        CREDITS("Credits", "credits", 5, new Color(245, 205, 110));
 
         public final String label, id;
         public final int defaultCost;
@@ -22,7 +22,7 @@ public final class PachinkoSettings {
 
     private static final int[] DEFAULT_AMOUNTS = {0, 1, 2, 4, 8, 16};
     private static final int[] HULLMOD_AMOUNTS = {0, 0, 0, 1, 1, 1};
-    private static final int[] TOKEN_AMOUNTS = {0, 1, 1, 1, 3, 12};
+    private static final int[] TOKEN_AMOUNTS = {0, 0, 0, 0, 8, 60};
     private static final int[] CREDIT_AMOUNTS = {0, 500, 2500, 10000, 50000, 200000};
     private PachinkoSettings() { }
 
@@ -35,7 +35,8 @@ public final class PachinkoSettings {
 
     public static int cost(Category category) {
         // A new key retires the saved two-token default without changing item-ball settings.
-        return setting(category==Category.TOKENS?"gd_pachinko_token_price":"gd_pachinko_cost_" + category.id,
+        return setting(category==Category.TOKENS?"gd_pachinko_token_price":
+                category==Category.CREDITS?"gd_pachinko_credit_price":"gd_pachinko_cost_" + category.id,
                 category.defaultCost, 1, 1000);
     }
 
@@ -48,7 +49,7 @@ public final class PachinkoSettings {
         int[] byDistance = new int[6];
         String prefix=switch(category) {
             case HULLMODS -> "gd_pachinko_hullmod_pocket_";
-            case TOKENS -> "gd_pachinko_token_pocket_";
+            case TOKENS -> "gd_pachinko_risky_token_pocket_";
             case CREDITS -> "gd_pachinko_credit_pocket_";
             case WEAPONS -> "gd_pachinko_pocket_";
         };
@@ -57,7 +58,8 @@ public final class PachinkoSettings {
             case CREDITS -> CREDIT_AMOUNTS;case WEAPONS -> DEFAULT_AMOUNTS;
         };
         for (int distance = 0; distance <= 5; distance++) {
-            byDistance[distance] = setting(prefix+distance, defaults[distance], 0, category==Category.CREDITS?2000000:100);
+            byDistance[distance] = setting(prefix+distance, defaults[distance], 0,
+                    category==Category.CREDITS?2000000:category==Category.TOKENS?1000:100);
         }
         int[] pockets = new int[PachinkoBoard.POCKETS];
         for (int i = 0; i < pockets.length; i++) pockets[i] = byDistance[Math.abs(i - 5)];

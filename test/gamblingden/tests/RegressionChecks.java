@@ -28,6 +28,7 @@ import gamblingden.den.DenDialog;
 import gamblingden.economy.*;
 import gamblingden.prizes.*;
 import gamblingden.slots.*;
+import gamblingden.pinball.*;
 
 /** Runs in a separate JVM with mock campaign data; never connects to a live game or save. */
 public class RegressionChecks {
@@ -553,7 +554,7 @@ public class RegressionChecks {
                     int[] expected = switch(category) {
                         case HULLMODS -> new int[]{1,1,1,0,0,0,0,0,1,1,1};
                         case WEAPONS -> new int[]{16,8,4,2,1,0,1,2,4,8,16};
-                        case TOKENS -> new int[]{12,3,1,1,1,0,1,1,1,3,12};
+                        case TOKENS -> new int[]{60,8,0,0,0,0,0,0,0,8,60};
                         case CREDITS -> new int[]{200000,50000,10000,2500,500,0,500,2500,10000,50000,200000};
                     };
                     for (int i=0;i<11;i++) check(offer.amount(i)==expected[i], "Wrong pachinko pocket layout");
@@ -669,7 +670,7 @@ public class RegressionChecks {
             reset(); TokenBank.addTokens(2000); weapons.add(weapon("custom_gun",1,false));
             for(int i=0;i<6;i++) settings.put("gd_pachinko_pocket_"+i,100);
             check(Arrays.equals(gamblingden.pachinko.PachinkoSettings.amounts(gamblingden.pachinko.PachinkoSettings.Category.TOKENS),
-                    new int[]{12,3,1,1,1,0,1,1,1,3,12}),"Old shared settings defeated token nerf");
+                    new int[]{60,8,0,0,0,0,0,0,0,8,60}),"Old shared settings defeated token nerf");
             check(Arrays.equals(gamblingden.pachinko.PachinkoSettings.amounts(gamblingden.pachinko.PachinkoSettings.Category.HULLMODS),
                     new int[]{1,1,1,0,0,0,0,0,1,1,1}),"Shared pocket sliders changed hullmod payouts");
             settings.put("gd_pachinko_cost_weapons",7);
@@ -835,13 +836,13 @@ public class RegressionChecks {
                 invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{700f,85f,true});
                 check(get(panel,"category")==gamblingden.pachinko.PachinkoSettings.Category.CREDITS,"Credits category click failed");
                 var offer=(gamblingden.pachinko.PachinkoRound.Offer)get(panel,"offer");
-                check(offer.cost==2 && offer.maximum()==200000,"Default credit-board quote incorrect");
+                check(offer.cost==5 && offer.maximum()==200000,"Default credit-board quote incorrect");
                 var labels=(List<?>)get(panel,"pocketLabels");
                 String[] expected={"200k","50k","10k","2.5k","500","0","500","2.5k","10k","50k","200k"};
                 for(int i=0;i<11;i++) check(((LabelAPI)labels.get(i)).getText().equals(expected[i]),"Credit pocket label wrong");
                 invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{500f,625f,false});
                 invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class},new Object[]{500f,625f,true});
-                check(TokenBank.getTokens()==9900,"Credits batch price wrong");
+                check(TokenBank.getTokens()==9750,"Credits batch price wrong");
                 long awarded;
                 try {
                     forbidRewards=true;
@@ -857,7 +858,7 @@ public class RegressionChecks {
                 else if(close.equals("escape")) panel.processInput(List.of(key(Keyboard.KEY_ESCAPE)));
                 else new gamblingden.pachinko.PachinkoDialogDelegate(panel,()->{}).reportDismissed(0);
                 panel.finishOnDismissal();
-                check(credits==awarded && TokenBank.getTokens()==9900,"Exit repeated credit payment or refunded a valid wager");
+                check(credits==awarded && TokenBank.getTokens()==9750,"Exit repeated credit payment or refunded a valid wager");
                 check(panel.getSessionLog().equals(List.of(awarded+" credits paid during play")),"Credit receipt missing/wrong");
             }
             reset();TokenBank.addTokens(10000);
@@ -869,7 +870,7 @@ public class RegressionChecks {
                 invoke(panel,"act",String.class,"skip");
             }
             var held=(gamblingden.pachinko.PachinkoWinnings)get(panel,"winnings");
-            check(held.credits()==2400000000L && credits==2400000000d && TokenBank.getTokens()==7600,"Large credit total overflow or token contamination");
+            check(held.credits()==2400000000L && credits==2400000000d && TokenBank.getTokens()==4000,"Large credit total overflow or token contamination");
             panel.finishOnDismissal();panel.finishOnDismissal();
             check(held.collect(new Random()).getCredits()==2400000000L && credits==2400000000d,"Large credit receipt overflow");
             System.out.println("PASS: credit Pachinko, mouse selection, immediate payment, every exit, and large totals.");
@@ -934,7 +935,7 @@ public class RegressionChecks {
             }
             check(held.weapons()==20000 && held.blueprints()==3,"New runs/categories lost or capped pooled winnings");
             invoke(panel,"act",String.class,"category:TOKENS");
-            for(int i=0;i<6;i++) settings.put("gd_pachinko_token_pocket_"+i,100);
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_risky_token_pocket_"+i,100);
             // Refresh the displayed quote before the new run.
             invoke(panel,"act",String.class,"category:WEAPONS");
             invoke(panel,"act",String.class,"category:TOKENS");
@@ -1441,14 +1442,131 @@ public class RegressionChecks {
         jackpotDefaults();recordIcons=false;
     }
 
+    private static void pinballStock() {
+        for(int i=0;i<20;i++) hullmods.add(hullmod("pinball_"+i,1));
+        weapons.add(weapon("pinball_gun",1,false));fighterSpecs.add(fighter("pinball_wing",1));
+    }
+    private static void pinball() throws Exception {
+        for(var category:PinballSettings.Category.values()) for(int tier=-1;tier<4;tier++) {
+            reset();pinballStock();TokenBank.addTokens(1000);
+            var offer=PinballSettings.quote(category);check(offer.cost==10,"Pinball entry price incorrect");
+            var game=PinballGame.buy(offer,new Random(72));
+            check(game!=null && TokenBank.getTokens()==990 && game.ballNumber()==1,"Pinball did not charge exactly one entry");
+            int score=tier<0?offer.scoreAt(0)-1:offer.scoreAt(tier);
+            set(game.board(),"score",score);
+            try {
+                forbidRewards=true;game.launch();game.advance(1f/60,true,true);
+                check(chips.isEmpty()&&guns.isEmpty()&&wings.isEmpty()&&credits==0&&TokenBank.getTokens()==990,"Pinball paid during play");
+            } finally { forbidRewards=false; }
+            game.finish();game.finish();game.advance(10,true,true);game.drainBall();
+            int amount=tier<0?0:offer.amountAt(tier);
+            var receipt=game.receipt();
+            check(game.finished()&&!game.launch()&&!game.nudge(),"Ended pinball round accepts controls");
+            check(receipt.getBlueprints()==(category==PinballSettings.Category.HULLMODS?amount:0),"Pinball blueprint prize wrong or Slots scaled it");
+            check(receipt.getWeapons()==(category==PinballSettings.Category.WEAPONS?amount:0),"Pinball weapon prize wrong");
+            check(receipt.getFighters()==(category==PinballSettings.Category.FIGHTERS?amount:0),"Pinball fighter prize wrong");
+            check(receipt.getCredits()==(category==PinballSettings.Category.CREDITS?amount:0),"Pinball credit prize wrong");
+            check(receipt.getTokens()==(category==PinballSettings.Category.TOKENS?amount:0),"Pinball token prize wrong");
+            check(TokenBank.getTokens()==990+receipt.getTokens()&&chips.size()==receipt.getBlueprints()
+                    &&guns.values().stream().mapToInt(n->n).sum()==receipt.getWeapons()
+                    &&wings.values().stream().mapToInt(n->n).sum()==receipt.getFighters()&&credits==receipt.getCredits(),"Repeated finish changed cargo");
+        }
+        reset();TokenBank.addTokens(9);
+        check(PinballGame.buy(PinballSettings.quote(PinballSettings.Category.TOKENS),new Random())==null&&TokenBank.getTokens()==9,"Unaffordable pinball accepted");
+        TokenBank.addTokens(91);
+        for(var category:List.of(PinballSettings.Category.HULLMODS,PinballSettings.Category.WEAPONS,PinballSettings.Category.FIGHTERS))
+            check(PinballGame.buy(PinballSettings.quote(category),new Random())==null&&TokenBank.getTokens()==100,"Empty reward pool charged entry");
+        var game=PinballGame.buy(PinballSettings.quote(PinballSettings.Category.TOKENS),new Random(1));
+        for(int i=0;i<3;i++) {
+            check(game.ballNumber()==i+1&&game.board().ready(),"Wrong next-ball state");
+            set(game.board(),"score",i==0?1000:i==1?2500:3000);game.drainBall();
+        }
+        check(game.finished()&&game.score()==6500&&TokenBank.getTokens()==105,"Three-ball score or once-only entry wrong");
+        game.finish();check(TokenBank.getTokens()==105,"Three-ball reward paid twice");
+
+        var loader=lunalib.backend.ui.settings.LunaSettingsLoader.INSTANCE;
+        boolean loaded=loader.getHasLoaded();var previous=lunalib.backend.ui.settings.LunaSettingsLoader.getSettings();
+        var settings=new org.lazywizard.lazylib.JSONUtils.CommonDataJSONObject("unused-test-settings");
+        for(String line:java.nio.file.Files.readAllLines(java.nio.file.Path.of("data/config/LunaSettings.csv"))) {
+            String[] c=line.split(",",-1);
+            if((line.startsWith("gd_pinball_")||line.startsWith("gd_pachinko_"))&&c[2].equals("Int"))
+                settings.put(c[0],Integer.parseInt(c[3]));
+        }
+        settings.put("gd_credit_percent",25);
+        try {
+            loader.setHasLoaded(true);lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(new HashMap<>(Map.of(Ids.MOD_ID,settings)));
+            settings.put("gd_pachinko_cost_credits",2);
+            for(int i=0;i<6;i++) settings.put("gd_pachinko_token_pocket_"+i,100);
+            check(gamblingden.pachinko.PachinkoSettings.cost(gamblingden.pachinko.PachinkoSettings.Category.CREDITS)==5,"Saved old price defeated five-token credit balls");
+            check(Arrays.equals(gamblingden.pachinko.PachinkoSettings.amounts(gamblingden.pachinko.PachinkoSettings.Category.TOKENS),
+                    new int[]{60,8,0,0,0,0,0,0,0,8,60}),"Saved stable board defeated risky token defaults");
+            reset();TokenBank.addTokens(1000);
+            var quoted=PinballSettings.quote(PinballSettings.Category.TOKENS);
+            game=PinballGame.buy(quoted,new Random(3));set(game.board(),"score",12000);
+            settings.put("gd_pinball_tokens_2",99999);settings.put("gd_pinball_price",99);
+            game.finish();check(TokenBank.getTokens()==1025,"Live settings changed an already-paid pinball prize");
+            check(PinballGame.buy(quoted,new Random())==null&&TokenBank.getTokens()==1025,"Stale paytable charged a different wager");
+        } finally { lunalib.backend.ui.settings.LunaSettingsLoader.setSettings(previous);loader.setHasLoaded(loaded); }
+
+        for(String close:List.of("leave","escape","external","collect","third-ball")) {
+            reset();TokenBank.addTokens(100);
+            var panel=(PinballPanel)machine(PinballPanel.class);
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class,boolean.class},new Object[]{120f,355f,true,false});
+            game=(PinballGame)get(panel,"game");
+            check(game!=null&&game.board().ready()&&TokenBank.getTokens()==90,"Pinball Play mouse button failed");
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class,boolean.class},new Object[]{120f,355f,true,false});
+            check(game.board().ready()&&TokenBank.getTokens()==90,"Held Play click auto-launched or charged twice");
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class,boolean.class},new Object[]{120f,355f,false,false});
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class,boolean.class},new Object[]{120f,355f,true,false});
+            check(game.board().playing(),"Launch mouse button failed");
+            invoke(panel,"act",String.class,"category:HULLMODS");
+            check(game.offer.category==PinballSettings.Category.TOKENS&&get(panel,"category")==PinballSettings.Category.TOKENS,"Category changed after payment");
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class,boolean.class},new Object[]{500f,420f,true,true});
+            panel.advance(.06f);
+            check(game.board().flipperRail(true).y2()<468&&game.board().flipperRail(false).y2()<468,"Simultaneous mouse flippers failed");
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class,boolean.class},new Object[]{620f,632f,true,false});
+            check(!(Boolean)get(panel,"mouseLeft")&&(Boolean)get(panel,"mouseRight"),"Right paddle has no left-clickable control");
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class,boolean.class},new Object[]{120f,410f,false,false});
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class,boolean.class},new Object[]{120f,410f,true,false});
+            check(game.board().heat()==1,"Nudge mouse button failed");
+            invoke(panel,"pointer",new Class<?>[]{float.class,float.class,boolean.class,boolean.class},new Object[]{120f,410f,true,false});
+            check(game.board().heat()==1,"Held mouse nudged repeatedly");
+            set(game.board(),"score",6500);
+            if(close.equals("leave")) invoke(panel,"act",String.class,"leave");
+            else if(close.equals("escape")) panel.processInput(List.of(key(Keyboard.KEY_ESCAPE)));
+            else if(close.equals("external")) {
+                int[] callbacks={0};var delegate=new PinballDialogDelegate(panel,()->callbacks[0]++);
+                delegate.reportDismissed(0);delegate.reportDismissed(0);check(callbacks[0]==1,"Pinball callback repeated");
+            } else if(close.equals("collect")) invoke(panel,"act",String.class,"collect");
+            else { game.drainBall();game.drainBall();game.drainBall();panel.advance(.01f); }
+            panel.finishOnDismissal();panel.finishOnDismissal();invoke(panel,"act",String.class,"play");
+            check(TokenBank.getTokens()==105&&game.finished(),"Pinball exit lost or repeated prize: "+close);
+            check(panel.getSessionLog().size()==2,"Pinball result log repeated or missing");
+            Pbuffer buffer=new Pbuffer(1200,800,new PixelFormat(),null);
+            try {
+                buffer.makeCurrent();
+                for(boolean clip:new boolean[]{false,true}) {
+                    if(clip) GL11.glEnable(GL11.GL_SCISSOR_TEST);else GL11.glDisable(GL11.GL_SCISSOR_TEST);
+                    GL11.glScissor(15,20,1100,700);panel.renderBelow(.8f);
+                    IntBuffer rect=BufferUtils.createIntBuffer(16);GL11.glGetInteger(GL11.GL_SCISSOR_BOX,rect);
+                    check(GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)==clip&&rect.get(0)==15&&rect.get(2)==1100&&GL11.glGetError()==GL11.GL_NO_ERROR,
+                            "Pinball graphics state leaked");
+                }
+            } finally { buffer.destroy(); }
+        }
+        System.out.println("PASS: pinball entry, all reward categories/tiers, three-ball score, mouse controls, settings, exits, and native rendering.");
+    }
+
     public static void main(String[] args) throws Exception {
+        if(args.length>0&&args[0].equals("pinball")) { setup();pinball();PinballPhysicsChecks.run();return; }
         if(args.length>0 && args[0].equals("background")) { setup();pachinkoBackground();return; }
         if(args.length>0 && args[0].equals("fast-renderer")) {
             setup(); FastRendererChecks.run(RegressionChecks::machine); return;
         }
         setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
         PachinkoPhysicsChecks.run(); PachinkoPhysicsChecks.multiBall(); pachinko(); pachinkoSettings(); pachinkoBatches();
-        pachinkoBackground(); pachinkoCredits(); boxDefaults(); PachinkoBalanceChecks.run(); BlackjackChecks.run(); blackjackUI(); blackjackCardArt(); expandedRewards(); jackpot();
+        pachinkoBackground(); pachinkoCredits(); boxDefaults(); PachinkoBalanceChecks.run(); pinball();PinballPhysicsChecks.run();
+        BlackjackChecks.run(); blackjackUI(); blackjackCardArt(); expandedRewards(); jackpot();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
     }
