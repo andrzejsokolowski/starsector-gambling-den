@@ -1,9 +1,12 @@
 {
+	"masterVersionFile":"https://raw.githubusercontent.com/andrzejsokolowski/starsector-gambling-den/main/gambling_den.version",
 	"modName":"Gambling Den",
+	"modThreadId":35993,
 	"modVersion": {
 		"major":1,
 		"minor":6,
-		"patch":2
+		"patch":3
 	},
-	"starsectorVersion":"0.98a-RC8"
+	"starsectorVersion":"0.98a-RC8",
+	"directDownloadURL":"https://github.com/andrzejsokolowski/starsector-gambling-den/releases/latest/download/GamblingDen.zip"
 }

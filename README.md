@@ -273,6 +273,27 @@ If `fr.jar` is installed in `starsector-core`, the checks also send 3,000 panel 
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
 
+## Updates and releases
+
+The mod links to [forum topic 35993](https://fractalsoftworks.com/forum/index.php?topic=35993).
+Launchers use `updateCheckURL` in `mod_info.json` to read the online version file.
+Version Checker uses `data/config/version/version_files.csv` to find the same file.
+The download link points to `GamblingDen.zip` on the latest published GitHub release.
+
+Versions before 1.6.3 lack these update links. Install 1.6.3 manually once to enable update detection for later releases.
+
+For each release, update both version numbers, run `./gradlew releaseZip`, and commit the files and compiled JAR.
+Push a matching Git tag, then publish a GitHub release for that tag with `GamblingDen.zip` attached.
+Make sure that the online version file and the downloaded ZIP contain the same version.
+A Git tag alone does not publish the update download.
+The build rejects missing update links, missing registration, and mismatched version numbers.
+
+## Changes in 1.6.3
+
+Adds the forum link, launcher update URL, Version Checker registration, and release download URL.
+The build now checks that the update data is complete and consistent.
+Gameplay is unchanged from 1.6.2, including its Pinball return gate, softer bounces, and controls legend.
+
 ## Changes in 1.6.2
 
 Pinball has a visible return gate that prevents balls from falling back down the launch lane.

@@ -59,7 +59,40 @@ tasks.register('regressionTest', JavaExec) {
     jvmArgs '--add-opens=java.base/java.util=ALL-UNNAMED', '--add-opens=java.base/java.lang.reflect=ALL-UNNAMED',
             '--add-opens=java.base/java.text=ALL-UNNAMED', '--add-opens=java.desktop/java.awt.font=ALL-UNNAMED'
 }
-tasks.named('check') { dependsOn tasks.named('regressionTest'), tasks.named('checkNoForbiddenApis') }
+tasks.register('checkVersionMetadata') {
+    doLast {
+        def infoFile = file('mod_info.json')
+        def versionFile = file('gambling_den.version')
+        def registrationFile = file('data/config/version/version_files.csv')
+        [infoFile, versionFile, registrationFile].each { metadata ->
+            if (!metadata.isFile()) throw new GradleException("Missing update metadata: ${metadata.name}")
+            if (metadata.getText('UTF-8').startsWith('\uFEFF'))
+                throw new GradleException("Remove the UTF-8 BOM from ${metadata.name}")
+        }
+        def parser = new groovy.json.JsonSlurper()
+        def info = parser.parse(infoFile, 'UTF-8')
+        def remote = parser.parse(versionFile, 'UTF-8')
+        def parts = ['major', 'minor', 'patch'].collect { remote.modVersion?.get(it)?.toString() }
+        if (parts.any { it == null || !(it ==~ /\d+/) } || info.version != parts.join('.'))
+            throw new GradleException('mod_info.json and gambling_den.version must have the same numeric version')
+        def masterUrl = 'https://raw.githubusercontent.com/andrzejsokolowski/starsector-gambling-den/main/gambling_den.version'
+        def downloadUrl = 'https://github.com/andrzejsokolowski/starsector-gambling-den/releases/latest/download/GamblingDen.zip'
+        if (info.id != 'gambling_den' || info.name != remote.modName)
+            throw new GradleException('Update metadata must identify Gambling Den')
+        if (info.updateCheckURL != masterUrl || remote.masterVersionFile != masterUrl)
+            throw new GradleException('Both update URLs must point to the published gambling_den.version file')
+        if (remote.directDownloadURL != downloadUrl)
+            throw new GradleException('The update download must point to the GamblingDen.zip release asset')
+        if (info.modThreadId?.toString() != '35993' || remote.modThreadId?.toString() != '35993')
+            throw new GradleException('Both metadata files must link to forum topic 35993')
+        if (info.gameVersion != remote.starsectorVersion)
+            throw new GradleException('The supported Starsector versions do not match')
+        if (registrationFile.readLines('UTF-8').findAll { !it.trim().isEmpty() } != ['version file', 'gambling_den.version'])
+            throw new GradleException('Version Checker must register gambling_den.version')
+        logger.lifecycle("Update metadata verified for Gambling Den ${info.version}")
+    }
+}
+tasks.named('check') { dependsOn tasks.named('regressionTest'), tasks.named('checkNoForbiddenApis'), tasks.named('checkVersionMetadata') }
 // These checks use a standalone game-API harness, not a JUnit engine.
 tasks.named('test') { enabled = false }
 
