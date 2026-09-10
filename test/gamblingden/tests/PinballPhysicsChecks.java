@@ -8,6 +8,26 @@ public final class PinballPhysicsChecks {
         var field=PinballBoard.class.getDeclaredField(name);field.setAccessible(true);field.set(board,value);
     }
     public static void run() throws Exception {
+        for(double x:new double[]{426,432,438}) for(double vx:new double[]{-200,0,200}) for(double vy:new double[]{100,400,1200}) {
+            var gate=new PinballBoard(new Random(1));gate.launch();
+            set(gate,"shooterGateClosed",true);set(gate,"x",x);set(gate,"y",94d);set(gate,"vx",vx);set(gate,"vy",vy);
+            boolean reachedTable=false;
+            for(int step=0;step<480&&gate.playing();step++) {
+                gate.advance(1f/240,false,false);
+                if(gate.x()>423&&gate.y()>150&&gate.y()<500) throw new AssertionError("Return gate leaked into shooter lane: start="
+                        +x+","+vx+","+vy+" step="+step+" at="+gate.x()+","+gate.y());
+                if(gate.x()<400) reachedTable=true;
+            }
+            if(!reachedTable) throw new AssertionError("Return gate trapped the ball");
+        }
+        var bounce=new PinballBoard(new Random(1));bounce.launch();set(bounce,"shooterGateClosed",true);
+        set(bounce,"x",174d);set(bounce,"y",132d);set(bounce,"vx",0d);set(bounce,"vy",350d);
+        bounce.advance(1f/240,false,false);
+        double firstRebound=-bounce.vy();int firstScore=bounce.score();
+        if(firstRebound<=0||firstRebound>=350||firstScore!=100) throw new AssertionError("Bumper still accelerates an ordinary impact excessively");
+        set(bounce,"x",174d);set(bounce,"y",132d);set(bounce,"vx",0d);set(bounce,"vy",350d);
+        bounce.advance(1f/240,false,false);
+        if(bounce.score()!=firstScore||-bounce.vy()>firstRebound-90) throw new AssertionError("Bumper kick bypassed its cooldown");
         double passive=0,held=0;
         for(String mode:new String[]{"passive","held","timed"}) {
             long points=0,hits=0,bumpers=0;int timeouts=0,loops=0;
@@ -59,7 +79,7 @@ public final class PinballPhysicsChecks {
         if(tilt.x()!=x||tilt.y()!=y) throw new AssertionError("Invalid time altered ball");
         tilt.drain();tilt.advance(20,true,true);
         if(!tilt.drained()||tilt.launch()||tilt.nudge()) throw new AssertionError("Drained ball restarted");
-        System.out.println("PASS: pinball skill/control comparison, bounds, frame-rate consistency, tilt, cooldowns, and invalid time.");
+        System.out.println("PASS: pinball return gate, softened impacts, skill/control comparison, bounds, frame-rate consistency, tilt, cooldowns, and invalid time.");
     }
     public static void main(String[] args) throws Exception { run(); }
 }

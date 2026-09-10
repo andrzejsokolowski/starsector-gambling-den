@@ -52,7 +52,11 @@ public final class PinballPanel extends BaseCustomUIPanelPlugin {
         button("play","Play",34,337,210,40);
         button("nudge","Nudge",34,391,210,38);
         button("drain","Drain ball",34,443,210,38);
-        label("NUDGE",DIM,34,511,210,18,Fonts.DEFAULT_SMALL);
+        label("NUDGE HEAT",DIM,34,487,210,18,Fonts.DEFAULT_SMALL);
+        label("CONTROLS",CYAN,20,539,236,18,Fonts.DEFAULT_SMALL);
+        String[] controls={"Left: left mouse / Left arrow","Right: right mouse / Right arrow",
+                "Space: play / launch","Nudge: push ball inward","Rapid nudges cause tilt"};
+        for(i=0;i<controls.length;i++) label(controls[i],DIM,20,561+i*18,236,18,Fonts.DEFAULT_SMALL);
         score=label("0",GOLD,754,84,212,28,Fonts.ORBITRON_20AA);
         ball=label("",DIM,754,124,212,20,Fonts.DEFAULT_SMALL);
         label("PRIZES",CYAN,754,169,212,20,Fonts.DEFAULT_SMALL);
@@ -226,6 +230,8 @@ public final class PinballPanel extends BaseCustomUIPanelPlugin {
             for(int i=0;i<PinballBoard.RAILS.size();i++) rail(PinballBoard.RAILS.get(i),4,i>=10?CYAN:DIM,alpha*.85f);
             for(var sling:PinballBoard.SLINGS) rail(sling,6,RED,alpha*.8f);
             var ball=board();
+            if(ball.shooterGateClosed()) rail(PinballBoard.SHOOTER_GATE,4,CYAN,alpha);
+            circle(PinballBoard.SHOOTER_GATE.x1(),PinballBoard.SHOOTER_GATE.y1(),4,GOLD,alpha);
             for(int i=0;i<3;i++) {
                 var b=PinballBoard.BUMPERS.get(i);float glow=ball.bumperFlash(i);
                 circle(b.x(),b.y(),b.radius()+8,CYAN,alpha*(.12f+.25f*glow));
@@ -249,7 +255,7 @@ public final class PinballPanel extends BaseCustomUIPanelPlugin {
             circle(bx-2,by-2,2.5f,Color.WHITE,alpha);
             for(int i=0;i<3;i++) {
                 float lit=Math.max(0,Math.min(1,ball.heat()-i));
-                GLDraw.circle(x(105+i*35),y(546),9,lit>0?RED:DIM,alpha*(.2f+.8f*lit),20);
+                GLDraw.circle(x(105+i*35),y(516),9,lit>0?RED:DIM,alpha*(.2f+.8f*lit),20);
             }
             for(Btn b:buttons) {
                 Color fill=!b.enabled?new Color(20,26,32):b.checked?new Color(40,93,105):b.hover?new Color(58,73,83):new Color(31,44,55);

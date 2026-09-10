@@ -147,6 +147,9 @@ Both can be held together. Each flipper also has a button that works with a left
 The arrow keys are optional alternatives, and Space operates Play or Launch.
 Moving paddles transfer momentum to the ball; holding them up is not the same as timing a flip.
 
+The launch lane has a one-way gate. It closes after the ball clears it and directs returning balls into the table.
+A controls legend lists the mouse buttons, arrow keys, Space, and Nudge.
+
 Bumpers score 100, slingshots 35, and round targets 250 before the multiplier.
 Lighting all three targets adds a 1,000-point bonus and raises the multiplier, up to 3x.
 The upper-left loop scores 500. Nudge pushes the ball, but repeated nudges cause tilt:
@@ -269,6 +272,18 @@ with both icon sizes into `GamblingDen.zip`.
 If `fr.jar` is installed in `starsector-core`, the checks also send 3,000 panel frames through
 its actual graphics bridge and verify that the old crash condition is detected. This uses
 an offscreen context, not a running campaign.
+
+## Changes in 1.6.2
+
+Pinball has a visible return gate that prevents balls from falling back down the launch lane.
+Launches no longer need a nudge to stay on the table.
+The table speed limit is roughly half the previous limit, with slower falls, softer bounces, and weaker bumper kicks.
+Bumpers and slingshots cannot repeat their kicks during their cooldown.
+
+A compact controls legend lists mouse buttons, arrow keys, Space, and Nudge, with a warning about tilt.
+Entry prices, reward tiers, and the other games are unchanged.
+Tests cover 1,000 unassisted launches, return-gate impacts, bounce strength, flipper timing, keyboard input, and frame-rate consistency.
+The layout passed an offscreen preview review. The revised feel still needs an in-game playtest.
 
 ## Changes in 1.6.1
 

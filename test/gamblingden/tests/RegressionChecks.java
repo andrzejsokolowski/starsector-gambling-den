@@ -1465,6 +1465,8 @@ public class RegressionChecks {
         check(rejected,"Input fixture did not reproduce Starsector's consumed-event guard");
         var panel=(PinballPanel)machine(PinballPanel.class);
         ((Random)get(panel,"random")).setSeed(1);
+        check(labelCaptions.containsAll(List.of("CONTROLS","Left: left mouse / Left arrow","Right: right mouse / Right arrow",
+                "Space: play / launch","Nudge: push ball inward","Rapid nudges cause tilt")),"Pinball controls legend missing");
         panel.processInput(null);
         panel.processInput(List.of(guard));
         check(!(Boolean)get(panel,"keyLeft"),"Already-consumed key changed a flipper");
@@ -1629,14 +1631,14 @@ public class RegressionChecks {
 
     public static void main(String[] args) throws Exception {
         if(args.length>0&&args[0].equals("pinball-keyboard")) { setup();pinballKeyboard();return; }
-        if(args.length>0&&args[0].equals("pinball")) { setup();pinballKeyboard();pinball();PinballPhysicsChecks.run();return; }
+        if(args.length>0&&args[0].equals("pinball")) { setup();pinballKeyboard();pinball();PinballLaunchChecks.run();PinballPhysicsChecks.run();return; }
         if(args.length>0 && args[0].equals("background")) { setup();pachinkoBackground();return; }
         if(args.length>0 && args[0].equals("fast-renderer")) {
             setup(); FastRendererChecks.run(RegressionChecks::machine); return;
         }
         setup(); reels(); prizes(); ships(); ui(); rewardDisplay(); legacy(); stakes(); odds();
         pinballKeyboard();PachinkoPhysicsChecks.run(); PachinkoPhysicsChecks.multiBall(); pachinko(); pachinkoSettings(); pachinkoBatches();
-        pachinkoBackground(); pachinkoCredits(); boxDefaults(); PachinkoBalanceChecks.run(); pinball();PinballPhysicsChecks.run();
+        pachinkoBackground(); pachinkoCredits(); boxDefaults(); PachinkoBalanceChecks.run(); pinball();PinballLaunchChecks.run();PinballPhysicsChecks.run();
         BlackjackChecks.run(); blackjackUI(); blackjackCardArt(); expandedRewards(); jackpot();
         FastRendererChecks.run(RegressionChecks::machine);
         System.out.println("PASS: "+assertions+" checks, including 4,500 reel completions; mock campaign and offscreen graphics only.");
