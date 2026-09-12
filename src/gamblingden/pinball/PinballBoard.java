@@ -21,10 +21,12 @@ public final class PinballBoard {
             new Bumper(275,149,24),new Bumper(225,245,24));
     public static final List<Bumper> TARGETS=List.of(new Bumper(108,113,10),
             new Bumper(240,69,10),new Bumper(364,228,10));
-    public static final List<Rail> SLINGS=List.of(new Rail(90,357,150,414),new Rail(150,414,100,423),
-            new Rail(100,423,90,357),new Rail(370,357,310,414),new Rail(310,414,360,423),new Rail(360,423,370,357));
+    // Both slingshots clear the side rails by more than a ball's width. Set closer, they
+    // pinched the outlanes into dead ends that caught and held the ball for good.
+    public static final List<Rail> SLINGS=List.of(new Rail(102,341,162,398),new Rail(162,398,112,407),
+            new Rail(112,407,102,341),new Rail(352,341,292,398),new Rail(292,398,342,407),new Rail(342,407,352,341));
     private double x=435,y=489,vx,vy,remainder,left=.35,right=.35,leftOmega,rightOmega;
-    private double heat,nudgeCooldown,quiet,loopWindow;
+    private double heat,nudgeCooldown,quiet,loopWindow,anchorX=435,anchorY=489;
     private final double launchX,launchY;
     private boolean launched,drained,tilted,loopArmed,shooterGateClosed;
     private int score,mask,multiplier=1,flipperHits,bumperHits,loops;
@@ -95,9 +97,12 @@ public final class PinballBoard {
             }
         }
         limitSpeed();
-        // A stationary geometry contact gets a small unscored rescue; flipper cradles are allowed.
-        if(y<395 && Math.hypot(vx,vy)<8) quiet+=STEP;else quiet=0;
-        if(quiet>3) { vx=x<WIDTH/2?65:-65;vy=-110;quiet=0; }
+        // A ball that stops going anywhere gets a small unscored rescue; flipper cradles are allowed.
+        // Measured as travel, not speed: a ball balanced on a target hops in place forever otherwise,
+        // because the target's own kick keeps its speed up while it never actually leaves.
+        if(!cradled() && Math.hypot(x-anchorX,y-anchorY)<3) quiet+=STEP;
+        else { quiet=0;anchorX=x;anchorY=y; }
+        if(quiet>3) { vx=x<WIDTH/2?65:-65;vy=-110;quiet=0;anchorX=x;anchorY=y; }
         if(y>HEIGHT+BALL_RADIUS || !Double.isFinite(x+y+vx+vy)) drain();
     }
     private void points(int amount) { if(!tilted) score=Math.min(999999,score+amount*multiplier); }
@@ -128,6 +133,16 @@ public final class PinballBoard {
         if(approach>=0) return false;
         vx-=((1+bounce)*approach-boost)*nx;vy-=((1+bounce)*approach-boost)*ny;
         return true;
+    }
+    /** A ball settled on a flipper is a cradle the player owns, so it never gets the wedge rescue. */
+    private boolean cradled() { return onFlipper(flipperRail(true)) || onFlipper(flipperRail(false)); }
+    private boolean onFlipper(Rail rail) {
+        double dx=rail.x2-rail.x1,dy=rail.y2-rail.y1;
+        double t=Math.max(0,Math.min(1,((x-rail.x1)*dx+(y-rail.y1)*dy)/(dx*dx+dy*dy)));
+        // Only the blade cradles a ball. A contact back at the pivot is the pocket between a held
+        // flipper and the side wall, which the player cannot shake loose and so must be rescued.
+        return t>BALL_RADIUS*2/FLIPPER_LENGTH
+                && Math.hypot(x-(rail.x1+dx*t),y-(rail.y1+dy*t))<BALL_RADIUS+FLIPPER_RADIUS+6;
     }
     private void flipper(boolean isLeft) {
         Rail rail=flipperRail(isLeft);
