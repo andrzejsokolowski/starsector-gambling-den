@@ -23,7 +23,6 @@ public class GamblingDenModPlugin extends BaseModPlugin {
     @Override
     public void onGameLoad(boolean newGame) {
         Config.load();
-        TokenBank.migrateOldKeys();
         LegacyBarCleanup.removeOldEvents();
         WeaponPool.clearCache();
         gamblingden.prizes.FighterPool.clearCache();

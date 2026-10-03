@@ -77,15 +77,4 @@ public class TokenBank {
         set(Ids.KEY_STAKE, Math.min(Config.STAKE_COUNT - 1, Math.max(0, stake)));
     }
 
-    /** Moves anything left over from when this mod was called Hullmod Dispenser. */
-    public static void migrateOldKeys() {
-        Map<String, Object> data = Global.getSector().getPersistentData();
-        Object oldTokens = data.get(Ids.OLD_KEY_TOKENS);
-        if (oldTokens instanceof Number && getTokens() == 0) {
-            set(Ids.KEY_TOKENS, (int) Math.max(0L, Math.min(Integer.MAX_VALUE, ((Number) oldTokens).longValue())));
-        }
-        for (String key : Ids.OLD_KEYS) {
-            data.remove(key);
-        }
-    }
 }

@@ -13,8 +13,7 @@ public final class LegacyBarCleanup {
 
     @SuppressWarnings("deprecation")
     private static boolean isLegacy(PortsideBarEvent event) {
-        return event instanceof hullmoddispenser.bar.DispenserBarEvent
-                || event instanceof gamblingden.bar.DenBarEvent;
+        return event instanceof gamblingden.bar.DenBarEvent;
     }
 
     public static void removeOldEvents() {
@@ -27,7 +26,7 @@ public final class LegacyBarCleanup {
         }
         for (GenericBarEventCreator creator : new ArrayList<GenericBarEventCreator>(manager.getCreators())) {
             String id = creator.getBarEventId();
-            if ("hmd_dispenser".equals(id) || "gd_den".equals(id)) {
+            if ("gd_den".equals(id)) {
                 manager.getCreators().remove(creator);
                 manager.getTimeout().remove(creator);
             }

@@ -418,10 +418,10 @@ public class RegressionChecks {
         reset();
         XStream xml=new XStream(new StaxDriver());
         XStream.setupDefaultSecurity(xml);
-        xml.allowTypes(new Class<?>[]{hullmoddispenser.bar.DispenserBarEvent.class, gamblingden.bar.DenBarEvent.class});
+        xml.allowTypes(new Class<?>[]{gamblingden.bar.DenBarEvent.class});
         PortsideBarData bar=new PortsideBarData();
         BarEventManager manager=new BarEventManager();
-        for(String name:List.of("hullmoddispenser.bar.DispenserBarEvent","gamblingden.bar.DenBarEvent")) {
+        for(String name:List.of("gamblingden.bar.DenBarEvent")) {
             PortsideBarEvent old=(PortsideBarEvent)xml.fromXML("<"+name+"/>");
             check(old.shouldRemoveEvent() && !old.shouldShowAtMarket(null),"Legacy event remained active");
             bar.addEvent(old); manager.getActive().set(old,30f);
@@ -429,8 +429,6 @@ public class RegressionChecks {
         BaseBarEvent other=new BaseBarEvent(); bar.addEvent(other); manager.getActive().set(other,30f);
         LegacyBarCleanup.removeOldEvents();
         check(bar.getEvents().equals(List.of(other)) && manager.getActive().getItems().equals(List.of(other)),"Legacy cleanup removed wrong events");
-        saved.put("hmd_tokens",42); TokenBank.migrateOldKeys();
-        check(TokenBank.getTokens()==42 && !saved.containsKey("hmd_tokens"),"Token migration");
     }
     private static void rewardDisplay() throws Exception {
         Pbuffer buffer=new Pbuffer(1200,800,new PixelFormat(),null);

@@ -19,10 +19,5 @@ public class Ids {
     public static final String KEY_REELS = "gd_reels";
     public static final String KEY_STAKE = "gd_stake";
 
-    /** Keys this mod used when it was called Hullmod Dispenser, migrated on load. */
-    public static final String OLD_KEY_TOKENS = "hmd_tokens";
-    public static final String[] OLD_KEYS = {
-            "hmd_tokens", "hmd_pity_any", "hmd_pity_top", "hmd_spins", "hmd_wins" };
-
     public static final String CONFIG_PATH = "data/config/gambling_den.json";
 }
