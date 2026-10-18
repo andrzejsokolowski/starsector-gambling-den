@@ -5,6 +5,16 @@ For requested gameplay changes and bug fixes, complete the release workflow unle
 Questions, investigations, and instruction-only changes do not require a new version or tag.
 Respect tool approval decisions. These instructions do not change sandbox permissions.
 
+## Notion
+
+Tasks, history, test lists and the ideas Andrzej rejected: the **Gambling Den board** in Andrzej's
+Notion, under **Starsector mods** (`collection://b89107ac-b0d0-4111-8540-219b0822cf58`). Working
+rules and game API notes: **Claude Information**
+(`collection://7bf9b1d6-b9e5-4b62-87f1-757bbaa51919`), starting with "Start here: working on
+Starsector mods through Notion". Read the board before working, give every task a ticket (ticket
+ids start with GD) and keep it current. Gambling Den is also bundled in Coalesced Little Mods:
+bring every change over there too. The Notion tools are deferred: load them with ToolSearch first.
+
 ## Required release workflow
 
 1. Preserve unrelated changes from the user and other agents.
