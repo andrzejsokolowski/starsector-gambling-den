@@ -1,5 +1,6 @@
 {
 	"masterVersionFile":"https://raw.githubusercontent.com/andrzejsokolowski/starsector-gambling-den/main/gambling_den.version",
+	"changelogURL":"https://raw.githubusercontent.com/andrzejsokolowski/starsector-gambling-den/main/changelog.txt",
 	"modName":"Gambling Den",
 	"modThreadId":35993,
 	"modVersion": {

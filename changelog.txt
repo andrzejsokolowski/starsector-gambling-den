@@ -1,0 +1,19 @@
+Version 1.6.5 (2026-10-03)
+- Removed support for saves from Hullmod Dispenser, the name this mod had before 0.2.0. Such saves no longer load with Gambling Den.
+
+Version 1.6.4 (2026-09-12)
+- Fixed Pinball trapping the ball: both slingshots sat closer to the side walls than a ball is wide, so a ball that rolled into either outlane wedged against the triangle.
+- A ball that settles anywhere it cannot get out of, including on top of a target, is now freed after a few seconds. A ball cradled on a flipper is still left alone.
+
+Version 1.6.3 (2026-09-10)
+- Multi-ball Pachinko for hullmods, weapons, tokens and credits, with 1/10/50-ball purchases and ball collisions. A high-risk token board at one token per ball and credit Pachinko at five tokens per ball.
+- Pinball with three-ball rounds, selectable rewards, mouse and keyboard flippers, nudging, tilt and a controls legend.
+- Blackjack with splitting, doubling, 3:2 blackjack payouts and full-card artwork.
+- Relic Jackpot for colony items and AI cores, with separate reward tiers, 15%/20%/25% match chances and a Skip button.
+- Slots: fighter LPC crates and rare story-point rewards. Default credit payouts reduced to 25% and hullmod box contents to 1/3/5.
+- Configurable reward quantities and pocket payouts, plus an optional anime background for Pachinko.
+- Removed the duplicate-blueprint exchange; the ship-sale option is now "Sell a ship for tokens".
+- Forum link, launcher update detection and a direct release download.
+
+Version 1.0.0 (2026-09-09)
+- First release: a gambling den at large markets. Sell surplus hulls for tokens and play Slots for credits, weapon crates and hull mod boxes.
