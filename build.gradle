@@ -96,43 +96,16 @@ tasks.named('check') { dependsOn tasks.named('regressionTest'), tasks.named('che
 // These checks use a standalone game-API harness, not a JUnit engine.
 tasks.named('test') { enabled = false }
 
-// Keep the supplied artwork intact; LunaLib uses the same 128px thumbnail as our other mods.
-tasks.register('prepareIcon') {
-    inputs.file('gambling-den-icon.png')
-    outputs.file('graphics/icons/gambling-den-small.png')
-    doLast {
-        def original = javax.imageio.ImageIO.read(file('gambling-den-icon.png'))
-        def thumbnail = new java.awt.image.BufferedImage(128, 128, java.awt.image.BufferedImage.TYPE_INT_ARGB)
-        def canvas = thumbnail.createGraphics()
-        try {
-            canvas.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
-                    java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
-            canvas.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING,
-                    java.awt.RenderingHints.VALUE_RENDER_QUALITY)
-            double scale = Math.min(128d / original.width, 128d / original.height)
-            int width = Math.round(original.width * scale) as int
-            int height = Math.round(original.height * scale) as int
-            canvas.drawImage(original, ((128 - width) / 2) as int, ((128 - height) / 2) as int,
-                    width, height, null)
-        } finally {
-            canvas.dispose()
-        }
-        def output = file('graphics/icons/gambling-den-small.png')
-        output.parentFile.mkdirs()
-        javax.imageio.ImageIO.write(thumbnail, 'png', output)
-    }
-}
-
 def releaseFiles = copySpec {
     from(projectDir) {
-        include 'mod_info.json', 'gambling_den.version', 'README.md', 'gambling-den-icon.png'
+        include 'mod_info.json', 'gambling_den.version', 'README.md', 'gambling-den-icon.png', 'icon.png'
         include 'THIRD_PARTY_NOTICES.txt', 'licenses/**'
         include 'data/**', 'graphics/**', 'jars/GamblingDen.jar'
     }
 }
 
 tasks.register('stageRelease', Copy) {
-    dependsOn tasks.named('jar'), tasks.named('prepareIcon')
+    dependsOn tasks.named('jar')
     with releaseFiles
     into layout.projectDirectory.dir('GamblingDen')
 }

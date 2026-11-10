@@ -1,3 +1,6 @@
+Version 1.6.6 (2026-11-10)
+- New gold icon in mod managers (TriOS) and in LunaLib's settings.
+
 Version 1.6.5 (2026-10-03)
 - Removed support for saves from Hullmod Dispenser, the name this mod had before 0.2.0. Such saves no longer load with Gambling Den.
 

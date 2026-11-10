@@ -267,7 +267,7 @@ The jar lands in `jars/`.
 Run `./gradlew check` for the standalone regression checks. They use mock campaign data and
 offscreen graphics; they do not open or change a live game. The graphics checks require the
 game's Windows native libraries. Run `./gradlew releaseZip` to check, build and package the mod
-with both icon sizes into `GamblingDen.zip`.
+into `GamblingDen.zip`.
 
 If `fr.jar` is installed in `starsector-core`, the checks also send 3,000 panel frames through
 its actual graphics bridge and verify that the old crash condition is detected. This uses
